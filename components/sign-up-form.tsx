@@ -1,120 +1,108 @@
 "use client";
 
-import { cn } from "@/lib/utils";
-import { createClient } from "@/lib/supabase/client";
+import Link from "next/link";
+import Image from "next/image";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { signUpAction } from "@/app/actions";
+import logoImage from "@/public/images/logo.png"; // Asegúrate de tener tu logo aquí
 
-export function SignUpForm({
-  className,
-  ...props
-}: React.ComponentPropsWithoutRef<"div">) {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [repeatPassword, setRepeatPassword] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const router = useRouter();
-
-  const handleSignUp = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const supabase = createClient();
-    setIsLoading(true);
-    setError(null);
-
-    if (password !== repeatPassword) {
-      setError("Passwords do not match");
-      setIsLoading(false);
-      return;
-    }
-
-    try {
-      const { error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          emailRedirectTo: `${window.location.origin}/protected`,
-        },
-      });
-      if (error) throw error;
-      router.push("/auth/sign-up-success");
-    } catch (error: unknown) {
-      setError(error instanceof Error ? error.message : "An error occurred");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
+export default function SignUp() {
   return (
-    <div className={cn("flex flex-col gap-6", className)} {...props}>
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-2xl">Sign up</CardTitle>
-          <CardDescription>Create a new account</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSignUp}>
-            <div className="flex flex-col gap-6">
-              <div className="grid gap-2">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="m@example.com"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                />
-              </div>
-              <div className="grid gap-2">
-                <div className="flex items-center">
-                  <Label htmlFor="password">Password</Label>
-                </div>
-                <Input
-                  id="password"
-                  type="password"
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                />
-              </div>
-              <div className="grid gap-2">
-                <div className="flex items-center">
-                  <Label htmlFor="repeat-password">Repeat Password</Label>
-                </div>
-                <Input
-                  id="repeat-password"
-                  type="password"
-                  required
-                  value={repeatPassword}
-                  onChange={(e) => setRepeatPassword(e.target.value)}
-                />
-              </div>
-              {error && <p className="text-sm text-red-500">{error}</p>}
-              <Button type="submit" className="w-full" disabled={isLoading}>
-                {isLoading ? "Creating an account..." : "Sign up"}
-              </Button>
+    <div className="min-h-screen bg-[#f2e6cf] font-gentium flex flex-col items-center py-12 px-4">
+      {/* Header con Logo y Volver */}
+      <div className="w-full max-w-5xl flex justify-between items-center mb-10">
+        <Link href="/" className="flex items-center gap-2.5">
+          <Image 
+            src={logoImage} 
+            alt="Logo de SkillSwap"
+            width={44}
+            height={44}
+            className="rounded-full shadow-sm"
+          />
+          <span className="text-2xl font-bold tracking-tight text-[#114c5f]">SkillSwap</span>
+        </Link>
+        <Link href="/" className="text-[#114c5f] underline text-sm font-medium tracking-tight hover:opacity-80 transition-opacity">
+          &lt; volver al inicio
+        </Link>
+      </div>
+
+      {/* Contenedor del Formulario (Tarjeta Blanca Personalizada) */}
+      <div className="bg-white rounded-[2.5rem] p-12 shadow-lg w-full max-w-5xl border border-[#9cd2d3]/20">
+        <h1 className="text-4xl font-extrabold text-center text-[#1a1a1a] mb-3">Registrar nueva cuenta</h1>
+        <p className="text-center text-[#4a4a4a] mb-12 text-base font-semibold max-w-md mx-auto leading-relaxed">
+          Completa toda la información necesaria para el registro.
+        </p>
+
+        <form action={signUpAction} className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-7">
+          {/* Nombre y Carrera */}
+          <div className="space-y-2.5">
+            <Label htmlFor="full_name" className="text-[#4a4a4a] text-xs font-bold uppercase tracking-wider">Nombre completo *</Label>
+            <Input name="full_name" required className="bg-[#eff6ff] border-none rounded-2xl h-12 px-5 text-base" />
+          </div>
+          <div className="space-y-2.5">
+            <Label htmlFor="career" className="text-[#4a4a4a] text-xs font-bold uppercase tracking-wider">Carrera *</Label>
+            <Input name="career" required className="bg-[#eff6ff] border-none rounded-2xl h-12 px-5 text-base" />
+          </div>
+
+          {/* Matrícula y Semestre */}
+          <div className="space-y-2.5">
+            <Label htmlFor="student_id" className="text-[#4a4a4a] text-xs font-bold uppercase tracking-wider">Matrícula *</Label>
+            <Input name="student_id" required className="bg-[#eff6ff] border-none rounded-2xl h-12 px-5 text-base" />
+          </div>
+          <div className="space-y-2.5 relative">
+            <Label htmlFor="semester" className="text-[#4a4a4a] text-xs font-bold uppercase tracking-wider">Semestre actual *</Label>
+            <select name="semester" required className="w-full bg-[#eff6ff] border-none rounded-2xl h-12 px-5 text-base text-gray-600 appearance-none cursor-pointer">
+              <option value="">Selecciona semestre</option>
+              {[1,2,3,4,5,6,7,8,9,10].map(s => <option key={s} value={s}>{s}° Semestre</option>)}
+            </select>
+            {/* Icono de flecha personalizado para el select */}
+            <div className="absolute right-5 top-[44px] pointer-events-none text-gray-400">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
             </div>
-            <div className="mt-4 text-center text-sm">
-              Already have an account?{" "}
-              <Link href="/auth/login" className="underline underline-offset-4">
-                Login
-              </Link>
+          </div>
+
+          {/* Intereses - Checkboxes */}
+          <div className="md:col-span-2 py-6">
+            <Label className="text-[#4a4a4a] text-xs font-bold uppercase tracking-wider mb-5 block">Intereses academicos o personales</Label>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-4 px-2">
+              {[
+                "Programación", "Idiomas", "Diseño", 
+                "Música", "Matemáticas", "Comunicación", 
+                "Deportes", "Herramientas digitales"
+              ].map((int) => (
+                <div key={int} className="flex items-center gap-3">
+                  <input type="checkbox" name="interests" value={int} className="w-5 h-5 border-[#9cd2d3] rounded shadow-sm accent-[#0057cc] cursor-pointer" />
+                  <span className="text-base text-[#4a4a4a] font-medium">{int}</span>
+                </div>
+              ))}
             </div>
-          </form>
-        </CardContent>
-      </Card>
+          </div>
+
+          {/* Correo Institucional */}
+          <div className="md:col-span-2 space-y-2.5">
+            <Label htmlFor="email" className="text-[#4a4a4a] text-xs font-bold uppercase tracking-wider">Correo electronico institucional *</Label>
+            <Input name="email" type="email" required placeholder="tu.correo@universidad.edu" className="bg-[#eff6ff] border-none rounded-2xl h-12 px-5 text-base placeholder:text-gray-400" />
+          </div>
+
+          {/* Password (Oculto en tu imagen, pero necesario) */}
+          <div className="md:col-span-2 space-y-2.5">
+            <Label htmlFor="password" className="text-[#4a4a4a] text-xs font-bold uppercase tracking-wider">Contraseña *</Label>
+            <Input name="password" type="password" required className="bg-[#eff6ff] border-none rounded-2xl h-12 px-5 text-base" />
+          </div>
+
+          {/* Botón y Switch */}
+          <div className="md:col-span-2 flex flex-col items-center gap-5 pt-10">
+            <Button type="submit" className="bg-[#0057cc] hover:bg-[#004bb3] w-full max-w-md h-14 rounded-2xl font-bold text-lg text-white shadow-lg shadow-[#0057cc]/20 transition-all">
+              Registrarse
+            </Button>
+            <p className="text-base text-[#4a4a4a]">
+              Ya tengo cuenta - <Link href="/auth/login" className="font-bold underline text-[#0057cc] hover:text-[#004bb3]">Iniciar sesión</Link>
+            </p>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }

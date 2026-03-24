@@ -102,6 +102,14 @@ export function LoginForm({
                 Sign up
               </Link>
             </div>
+            <div>
+              <Link
+                href="/"
+                className="underline underline-offset-4"
+              >
+                Resexo
+              </Link>
+            </div>
           </form>
         </CardContent>
       </Card>

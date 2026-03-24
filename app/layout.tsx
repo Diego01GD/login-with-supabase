@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Geist } from "next/font/google";
+import { Gentium_Book_Plus } from "next/font/google";
 import { ThemeProvider } from "next-themes";
 import "./globals.css";
 
@@ -9,14 +9,16 @@ const defaultUrl = process.env.VERCEL_URL
 
 export const metadata: Metadata = {
   metadataBase: new URL(defaultUrl),
-  title: "Next.js and Supabase Starter Kit",
-  description: "The fastest way to build apps with Next.js and Supabase",
+  title: "SkillSwap",
+  description: "Sex for everyone",
 };
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  display: "swap",
+// Configuración de Gentium
+const gentium = Gentium_Book_Plus({
+  variable: "--font-gentium",
   subsets: ["latin"],
+  weight: ["400", "700"],
+  display: "swap",
 });
 
 export default function RootLayout({
@@ -25,8 +27,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <body className={`${geistSans.className} antialiased`}>
+    <html lang="es" suppressHydrationWarning>
+      <body className={`${gentium.variable} font-gentium antialiased`}>
         <ThemeProvider
           attribute="class"
           defaultTheme="system"
