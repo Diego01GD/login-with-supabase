@@ -3,10 +3,14 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 
-export async function signUpAction(formData: FormData) {
+export type FormState = {
+  error?: string;
+};
+
+export async function signUpAction(prevState: FormState, formData: FormData): Promise<FormState> {
   const supabase = await createClient();
 
-  // Recolección de datos del formulario
+  // Recolección de datos
   const email = formData.get("email") as string;
   const password = formData.get("password") as string;
   const fullName = formData.get("full_name") as string;
@@ -16,47 +20,38 @@ export async function signUpAction(formData: FormData) {
   const interests = formData.getAll("interests") as string[];
   const scheduleOptions = formData.getAll("schedule_options") as string[];
 
-  // 1. Validación de Fuerza (Lógica de servidor)
+  // 1. Validación de seguridad en servidor
   const hasUpper = /[A-Z]/.test(password);
   const hasNum = /[0-9]/.test(password);
   const hasSpecial = /[^A-Za-z0-9]/.test(password);
   
   if (password.length < 8 || !hasUpper || !hasNum || !hasSpecial) {
-    return redirect(`/auth/sign-up?error=${encodeURIComponent("La contraseña no cumple con los requisitos.")}`);
+    return { error: "La contraseña no cumple con los requisitos de seguridad." };
   }
 
-  // 2. Registro en el esquema AUTH (auth.users)
+  // 2. Registro en Supabase Auth
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
     options: {
-      // Guardamos metadatos básicos en auth.users para facilitar el acceso rápido
-      data: { 
-        full_name: fullName, 
-        career: career 
-      },
+      data: { full_name: fullName, career: career },
       emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback`,
     },
   });
 
-  if (error) {
-    return redirect(`/auth/sign-up?error=${encodeURIComponent(error.message)}`);
+  if (error) return { error: error.message };
+
+  // 3. Verificar si el correo ya existe (identities vacías)
+  if (data.user?.identities?.length === 0) {
+    return { error: "Este correo electrónico ya está registrado." };
   }
 
-  // 3. DETECCIÓN DE USUARIO EXISTENTE
-  // Si Supabase no devuelve identidades, el usuario ya existía.
-  // Esto evita la redirección falsa al "éxito".
-  if (data.user && data.user.identities && data.user.identities.length === 0) {
-    return redirect(`/auth/sign-up?error=${encodeURIComponent("Este correo electrónico ya está registrado.")}`);
-  }
-
-  // 4. Inserción en el esquema PUBLIC (public.profiles)
-  // Solo llegamos aquí si el usuario es realmente nuevo
+  // 4. Inserción en tabla Profiles
   if (data.user) {
     const { error: profileError } = await supabase
       .from("profiles")
       .insert([{
-        id: data.user.id, // Referencia al ID de auth.users (FK)
+        id: data.user.id,
         full_name: fullName,
         career: career,
         student_id: studentId,
@@ -65,12 +60,8 @@ export async function signUpAction(formData: FormData) {
         schedule_options: scheduleOptions,
       }]);
       
-    if (profileError) {
-      console.error("Error en public.profiles:", profileError.message);
-      // Opcional: Podrías manejar aquí un borrado del auth.user si el perfil falla
-      return redirect(`/auth/sign-up?error=${encodeURIComponent("Error al crear el perfil adicional.")}`);
-    }
+    if (profileError) return { error: "Error al crear el perfil en la base de datos." };
   }
 
-  return redirect("/auth/sign-up-success");
+  redirect("/auth/sign-up-success");
 }

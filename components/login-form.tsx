@@ -1,30 +1,30 @@
 "use client";
 
-import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import Link from "next/link";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, useEffect } from "react"; // Añadido useEffect
+import { Mail, Eye, EyeOff, Loader2 } from "lucide-react";
+import ImgP from "@/public/images/login-illustration.png";
 
-export function LoginForm({
-  className,
-  ...props
-}: React.ComponentPropsWithoutRef<"div">) {
+export function LoginForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
+
+  // Limpieza de campos por seguridad al entrar a la ventana
+  useEffect(() => {
+    setEmail("");
+    setPassword("");
+    setError(null);
+  }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,86 +33,103 @@ export function LoginForm({
     setError(null);
 
     try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-      if (error) throw error;
-      // Update this route to redirect to an authenticated route. The user already has an active session.
+      const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+      if (signInError) throw signInError;
+      
       router.push("/protected");
-    } catch (error: unknown) {
-      setError(error instanceof Error ? error.message : "An error occurred");
+    } catch {
+      // Omitimos la variable del error para evitar el aviso de "definida pero no usada"
+      setError("Correo o contraseña incorrectos"); 
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <div className={cn("flex flex-col gap-6", className)} {...props}>
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-2xl">Login</CardTitle>
-          <CardDescription>
-            Enter your email below to login to your account
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleLogin}>
-            <div className="flex flex-col gap-6">
-              <div className="grid gap-2">
-                <Label htmlFor="email">Email</Label>
+    <div className="bg-white rounded-[2.5rem] shadow-2xl overflow-hidden p-8 md:p-14 border border-[#9cd2d3]/20">
+      <h1 className="text-4xl md:text-5xl font-bold text-[#114c5f] text-center mb-12">
+        Iniciar Sesión en SkillSwap
+      </h1>
+
+      <div className="flex flex-col md:flex-row gap-12 items-center">  
+        <div className="w-full md:w-1/2 flex flex-col">
+          <form onSubmit={handleLogin} className="space-y-6">
+            <div className="space-y-2">
+              <Label htmlFor="email" className="text-[#114c5f] font-bold text-lg">Correo Universitario</Label>
+              <div className="relative">
+                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
                 <Input
                   id="email"
                   type="email"
-                  placeholder="m@example.com"
+                  placeholder="nombre@universidad.edu"
+                  autoComplete="off" // Refuerzo de seguridad
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
+                  className="pl-10 h-12 rounded-xl bg-[#eff6ff] border-none text-[#114c5f] md:text-lg"
                 />
               </div>
-              <div className="grid gap-2">
-                <div className="flex items-center">
-                  <Label htmlFor="password">Password</Label>
-                  <Link
-                    href="/auth/forgot-password"
-                    className="ml-auto inline-block text-sm underline-offset-4 hover:underline"
-                  >
-                    Forgot your password?
-                  </Link>
-                </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="password" className="text-[#114c5f] font-bold text-lg">Contraseña</Label>
+              <div className="relative">
                 <Input
                   id="password"
-                  type="password"
+                  type={showPassword ? "text" : "password"}
+                  placeholder="Contraseña"
+                  autoComplete="current-password"
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
+                  className="h-12 rounded-xl bg-[#eff6ff] border-none pr-10 text-[#114c5f] md:text-lg"
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400"
+                >
+                  {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                </button>
               </div>
-              {error && <p className="text-sm text-red-500">{error}</p>}
-              <Button type="submit" className="w-full" disabled={isLoading}>
-                {isLoading ? "Logging in..." : "Login"}
-              </Button>
             </div>
-            <div className="mt-4 text-center text-sm">
-              Don&apos;t have an account?{" "}
+
+            <div className="flex flex-col gap-1">
+              {error && <p className="text-lg text-red-600 font-bold mb-3">{error}</p>}
               <Link
-                href="/auth/sign-up"
-                className="underline underline-offset-4"
+                href="/auth/forgot-password"
+                className="text-lg text-[#114c5f] font-bold underline decoration-2 underline-offset-4"
               >
-                Sign up
+                ¿Olvidaste tu contraseña?
               </Link>
             </div>
-            <div>
-              <Link
-                href="/"
-                className="underline underline-offset-4"
-              >
-                Resexo
+
+            <Button 
+              type="submit" 
+              disabled={isLoading}
+              className="w-full h-12 bg-[#4a7c92] hover:bg-[#3d6678] text-white font-bold rounded-xl text-xl shadow-md transition-all"
+            >
+              {isLoading ? <Loader2 className="animate-spin" /> : "Entrar"}
+            </Button>
+
+            <div className="text-center pt-2">
+              <Link href="/" className="text-[#114c5f] font-bold text-base flex items-center justify-center gap-1">
+                <span>←</span> Volver a la página principal
               </Link>
             </div>
           </form>
-        </CardContent>
-      </Card>
+        </div>
+
+        <div className="hidden md:block w-1/2">
+          <Image
+            src={ImgP}
+            alt="Estudiantes compartiendo conocimientos"
+            width={500}
+            height={400}
+            className="object-contain"
+          />
+        </div>
+      </div>
     </div>
   );
 }

@@ -1,11 +1,17 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import Image from "next/image";
+import { createClient } from "@/lib/supabase/server";
 import LogoSS from "@/public/images/logo.png"
 
-export default function SkillSwapLanding() {
+
+export default async function SkillSwapLanding() {
+
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+
   return (
-    <div className="min-h-screen bg-[#f2e6cf] font-gentium text-[#114c5f]">
+    <div className="min-h-screen bg-[#f7f3e7] font-gentium text-[#114c5f]">
       {/* --- Navbar --- */}
       <nav className="flex items-center justify-between px-12 py-4 bg-white/80 backdrop-blur-sm sticky top-0 z-50 border-b border-[#9cd2d3]/20">
         <div className="flex items-center gap-2">
@@ -22,21 +28,31 @@ export default function SkillSwapLanding() {
         </div>
         
         <div className="flex items-center gap-8">
-          <Link 
-            href="/auth/login" 
-            className="text-lg font-semibold hover:text-[#0799b6] transition-colors"
-          >
-            Iniciar Sesión
-          </Link>
-          <Button asChild className="bg-[#0057cc] hover:bg-[#004bb3] text-white px-8 h-10 rounded-md font-bold text-lg">
-            <Link href="/auth/sign-up">Registrarse</Link>
-          </Button>
+          {!user ? (
+            /* --- MOSTRAR SI NO HAY SESIÓN --- */
+            <>
+              <Link 
+                href="/auth/login" 
+                className="text-lg font-semibold hover:text-[#0799b6] transition-colors"
+              >
+                Iniciar Sesión
+              </Link>
+              <Button asChild className="bg-[#3983A6] hover:bg-[#4aaad7] text-white px-8 h-10 rounded-md font-bold text-lg transition-all">
+                <Link href="/auth/sign-up">Registrarse</Link>
+              </Button>
+            </>
+          ) : (
+            /* --- MOSTRAR SI YA HAY SESIÓN --- */
+            <Button asChild className="bg-[#114c5f] hover:bg-[#0799b6] text-white px-8 h-10 rounded-md font-bold text-lg shadow-lg transition-all">
+              <Link href="/protected">Ir a mi Dashboard</Link>
+            </Button>
+          )}
         </div>
       </nav>
 
       <main className="max-w-7xl mx-auto px-6 pt-16">
         {/* --- Hero Section (El cuadro azul claro) --- */}
-        <section className="bg-[#eff6ff] rounded-[3rem] py-24 px-12 text-center shadow-sm mx-4">
+        <section className="bg-white rounded-[3rem] py-24 px-12 text-center shadow-sm mx-4">
           <h1 className="text-5xl md:text-6xl font-extrabold leading-tight mb-8 text-[#1a1a1a]">
             Intercambia conocimientos,<br />
             potencia tu carrera
@@ -44,7 +60,7 @@ export default function SkillSwapLanding() {
           <p className="text-xl text-[#4a4a4a] max-w-2xl mx-auto mb-10 font-medium leading-relaxed">
             La plataforma exclusiva para estudiantes donde enseñas lo que amas y aprendes lo que necesitas
           </p>
-          <Button asChild className="bg-[#0057cc] hover:bg-[#004bb3] text-white text-lg py-7 px-10 rounded-lg shadow-md font-bold">
+          <Button asChild className="bg-[#3983A6] hover:bg-[#4aaad7] text-white text-lg py-7 px-10 rounded-lg shadow-md font-bold">
             <Link href="/auth/sign-up">Unete con tu correo universitario</Link>
           </Button>
         </section>
