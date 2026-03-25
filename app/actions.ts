@@ -7,7 +7,10 @@ export type FormState = {
   error?: string;
 };
 
-export async function signUpAction(prevState: FormState, formData: FormData): Promise<FormState> {
+export async function signUpAction(
+  prevState: FormState,
+  formData: FormData,
+): Promise<FormState> {
   const supabase = await createClient();
 
   // Recolección de datos
@@ -24,9 +27,11 @@ export async function signUpAction(prevState: FormState, formData: FormData): Pr
   const hasUpper = /[A-Z]/.test(password);
   const hasNum = /[0-9]/.test(password);
   const hasSpecial = /[^A-Za-z0-9]/.test(password);
-  
+
   if (password.length < 8 || !hasUpper || !hasNum || !hasSpecial) {
-    return { error: "La contraseña no cumple con los requisitos de seguridad." };
+    return {
+      error: "La contraseña no cumple con los requisitos de seguridad.",
+    };
   }
 
   // 2. Registro en Supabase Auth
@@ -48,9 +53,8 @@ export async function signUpAction(prevState: FormState, formData: FormData): Pr
 
   // 4. Inserción en tabla Profiles
   if (data.user) {
-    const { error: profileError } = await supabase
-      .from("profiles")
-      .insert([{
+    const { error: profileError } = await supabase.from("profiles").insert([
+      {
         id: data.user.id,
         full_name: fullName,
         career: career,
@@ -58,9 +62,12 @@ export async function signUpAction(prevState: FormState, formData: FormData): Pr
         semester: semester,
         interests: interests,
         schedule_options: scheduleOptions,
-      }]);
-      
-    if (profileError) return { error: "Error al crear el perfil en la base de datos." };
+        is_complete: false, // Asegurar que el perfil esté incompleto al registrarse
+      },
+    ]);
+
+    if (profileError)
+      return { error: "Error al crear el perfil en la base de datos." };
   }
 
   redirect("/auth/sign-up-success");

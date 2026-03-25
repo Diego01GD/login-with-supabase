@@ -33,13 +33,35 @@ export function LoginForm() {
     setError(null);
 
     try {
-      const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+      const { data, error: signInError } =
+        await supabase.auth.signInWithPassword({ email, password });
       if (signInError) throw signInError;
-      
-      router.push("/protected");
-    } catch {
-      // Omitimos la variable del error para evitar el aviso de "definida pero no usada"
-      setError("Correo o contraseña incorrectos"); 
+
+      const user = data.user;
+      if (!user) {
+        setError("No se pudo obtener el usuario tras iniciar sesión.");
+        return;
+      }
+
+      // Elegir ruta basado en estado de complete profile
+      const { data: profileData, error: profileError } = await supabase
+        .from("profiles")
+        .select("is_complete")
+        .eq("id", user.id)
+        .maybeSingle();
+
+      if (profileError) {
+        throw profileError;
+      }
+
+      const isComplete = profileData?.is_complete === true;
+      const destination = isComplete ? "/protected" : "/auth/complete-profile";
+      router.replace(destination);
+    } catch (err) {
+      console.error(err);
+      const message =
+        err instanceof Error ? err.message : "Correo o contraseña incorrectos";
+      setError(message);
     } finally {
       setIsLoading(false);
     }
@@ -51,13 +73,21 @@ export function LoginForm() {
         Iniciar Sesión en SkillSwap
       </h1>
 
-      <div className="flex flex-col md:flex-row gap-12 items-center">  
+      <div className="flex flex-col md:flex-row gap-12 items-center">
         <div className="w-full md:w-1/2 flex flex-col">
           <form onSubmit={handleLogin} className="space-y-6">
             <div className="space-y-2">
-              <Label htmlFor="email" className="text-[#114c5f] font-bold text-lg">Correo Universitario</Label>
+              <Label
+                htmlFor="email"
+                className="text-[#114c5f] font-bold text-lg"
+              >
+                Correo Universitario
+              </Label>
               <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
+                <Mail
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                  size={20}
+                />
                 <Input
                   id="email"
                   type="email"
@@ -72,7 +102,12 @@ export function LoginForm() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="password" className="text-[#114c5f] font-bold text-lg">Contraseña</Label>
+              <Label
+                htmlFor="password"
+                className="text-[#114c5f] font-bold text-lg"
+              >
+                Contraseña
+              </Label>
               <div className="relative">
                 <Input
                   id="password"
@@ -95,7 +130,9 @@ export function LoginForm() {
             </div>
 
             <div className="flex flex-col gap-1">
-              {error && <p className="text-lg text-red-600 font-bold mb-3">{error}</p>}
+              {error && (
+                <p className="text-lg text-red-600 font-bold mb-3">{error}</p>
+              )}
               <Link
                 href="/auth/forgot-password"
                 className="text-lg text-[#114c5f] font-bold underline decoration-2 underline-offset-4"
@@ -104,8 +141,8 @@ export function LoginForm() {
               </Link>
             </div>
 
-            <Button 
-              type="submit" 
+            <Button
+              type="submit"
               disabled={isLoading}
               className="w-full h-12 bg-[#4a7c92] hover:bg-[#3d6678] text-white font-bold rounded-xl text-xl shadow-md transition-all"
             >
@@ -113,7 +150,10 @@ export function LoginForm() {
             </Button>
 
             <div className="text-center pt-2">
-              <Link href="/" className="text-[#114c5f] font-bold text-base flex items-center justify-center gap-1">
+              <Link
+                href="/"
+                className="text-[#114c5f] font-bold text-base flex items-center justify-center gap-1"
+              >
                 <span>←</span> Volver a la página principal
               </Link>
             </div>
