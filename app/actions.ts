@@ -23,7 +23,15 @@ export async function signUpAction(
   const interests = formData.getAll("interests") as string[];
   const scheduleOptions = formData.getAll("schedule_options") as string[];
 
-  // 1. Validación de seguridad en servidor
+  // 1. Validación correo universitario obligatorio
+  const allowedDomain = "@merida.tecnm.mx";
+  if (!email.toLowerCase().endsWith(allowedDomain)) {
+    return {
+      error: `El correo debe ser institucional con extensión ${allowedDomain}`,
+    };
+  }
+
+  // 2. Validación de seguridad en servidor
   const hasUpper = /[A-Z]/.test(password);
   const hasNum = /[0-9]/.test(password);
   const hasSpecial = /[^A-Za-z0-9]/.test(password);
@@ -34,7 +42,7 @@ export async function signUpAction(
     };
   }
 
-  // 2. Registro en Supabase Auth
+  // 3. Registro en Supabase Auth
   const { data, error } = await supabase.auth.signUp({
     email,
     password,

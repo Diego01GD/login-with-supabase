@@ -4,6 +4,10 @@ import Image from "next/image";
 import { createClient } from "@/lib/supabase/server";
 import { Suspense } from "react";
 import LogoSS from "@/public/images/logo.png";
+import program from "@/public/images/programacion.png";
+import idiomas from "@/public/images/idiomas.webp";
+import musica from "@/public/images/musica.webp";
+import mate from "@/public/images/matematicas.webp";
 
 export default async function SkillSwapLanding() {
   return (
@@ -105,14 +109,47 @@ export default async function SkillSwapLanding() {
           <h2 className="text-5xl font-extrabold text-center mb-14 text-[#1a1a1a]">
             Categorías destacadas
           </h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 max-w-5xl mx-auto">
-            {["Programacion", "Idiomas", "Musica", "Matematicas"].map((cat) => (
-              <div
-                key={cat}
-                className="bg-[#eff6ff] border-2 border-[#0057cc]/30 py-6 rounded-xl text-center hover:bg-[#e0eeff] hover:border-[#0057cc] transition-all cursor-pointer shadow-sm"
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 max-w-7xl mx-auto">
+            {[
+              {
+                name: "Programación",
+                image: program,
+                desc: "Aprende los lenguajes que mueven el mundo digital.",
+              },
+              {
+                name: "Idiomas",
+                image: idiomas,
+                desc: "Conecta con otras culturas y expande tus horizontes.",
+              },
+              {
+                name: "Música",
+                image: musica,
+                desc: "Descubre tu talento y expresa tu pasión musical.",
+              },
+              {
+                name: "Matemáticas",
+                image: mate,
+                desc: "Resuelve problemas complejos con lógica y precisión.",
+              },
+            ].map((cat) => (
+              <article
+                key={cat.name}
+                className="bg-white rounded-3xl p-6 border border-[#e8edf4] shadow-lg hover:shadow-2xl transition-shadow duration-300"
               >
-                <span className="font-bold text-[#0057cc] text-lg">{cat}</span>
-              </div>
+                <div className="h-36 w-36 mx-auto rounded-full bg-[#f2f8ff] flex items-center justify-center mb-4 overflow-hidden">
+                  <Image
+                    src={cat.image}
+                    alt={cat.name}
+                    className="object-contain w-28"
+                  />
+                </div>
+                <h3 className="text-xl font-extrabold text-[#1a1a1a] mb-2 text-center">
+                  {cat.name}
+                </h3>
+                <p className="text-center text-[#4a4a4a] text-sm leading-relaxed">
+                  {cat.desc}
+                </p>
+              </article>
             ))}
           </div>
         </section>

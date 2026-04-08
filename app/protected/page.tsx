@@ -189,7 +189,7 @@ export default async function ProtectedPage() {
             </h2>
             <p className="text-5xl font-black text-[#0f4f6f]">{reputation}</p>
             <p className="text-sm text-[#385e7d] mt-1">
-              colaboraciones exitosas
+              Colaboraciones exitosas
             </p>
           </article>
 
