@@ -23,7 +23,7 @@ export default async function SkillSwapLanding() {
             <Image
               src={LogoSS}
               alt="SkillSwap"
-              className="rounded-full shadow-sm w-40 mr-3"
+              className="rounded-full shadow-sm w-32 mr-3"
             />
 
             <span className="text-xl font-bold tracking-tight ">SkillSwap</span>

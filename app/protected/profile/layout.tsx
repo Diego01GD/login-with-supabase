@@ -14,7 +14,7 @@ export default function ProtectedLayout({
         <nav className="flex items-center justify-between px-12 py-4 bg-white/80 backdrop-blur-sm sticky top-0 z-50 border-b border-[#9cd2d3]/20">
             <div className="flex items-center gap-2">
               {/* Logo Placeholder */}
-              <Link href="/" className="flex items-center hover:opacity-90 transition-opacity">
+              <Link href="/protected" className="flex items-center hover:opacity-90 transition-opacity">
                 <Image
                   src={LogoSS}
                   alt="SkillSwap"

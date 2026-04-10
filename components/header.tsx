@@ -10,7 +10,7 @@ export default function Header() {
         <Image 
           src={logoImage} 
           alt="SkillSwap Logo" 
-          className="w-28"
+          className="w-32"
         />
         <span className="text-2xl font-bold text-[#114c5f]">SkillSwap</span>
       </Link>
