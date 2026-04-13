@@ -75,7 +75,7 @@ export default function SignUp() {
     <div className="min-h-screen bg-[#f7f3e7] font-gentium flex flex-col items-center pb-4">
       <div className="w-full flex justify-between items-center mb-10 bg-white px-12 py-4">
         <Link href="/" className="flex items-center gap-2.5">
-          <Image src={logoImage} alt="Logo" className="rounded-full w-40 mr-3" />
+          <Image src={logoImage} alt="Logo" className="rounded-full w-32 mr-3" />
           <span className="text-2xl font-bold text-[#114c5f]">SkillSwap</span>
         </Link>
         <Link href="/" className="text-slate-700 text-lg font-semibold hover:text-[#0799b6] transition-colors">
