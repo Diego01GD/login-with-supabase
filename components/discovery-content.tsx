@@ -32,6 +32,8 @@ interface DiscoveryContentProps {
   matchCount?: number;
   currentUserId?: string;
   skillMap: Record<string, Skill>;
+  activeExchangesCount?: number;
+  pendingReceivedCount?: number;
 }
 
 export function DiscoveryContent({
@@ -42,6 +44,8 @@ export function DiscoveryContent({
   matchCount = 0,
   currentUserId,
   skillMap,
+  activeExchangesCount = 0,
+  pendingReceivedCount = 0,
 }: DiscoveryContentProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<
@@ -343,19 +347,21 @@ export function DiscoveryContent({
           </h3>
           <p className="text-[#4a4a4a] mb-4">
             Tienes{" "}
-            <span className="font-bold text-[#0057cc]">{matchCount}</span> de{" "}
-            <span className="font-bold">5</span> intercambios activos
+            <span className="font-bold text-[#0057cc]">
+              {activeExchangesCount}
+            </span>{" "}
+            de <span className="font-bold">5</span> intercambios activos
           </p>
 
           {/* Barra de progreso */}
           <div className="w-full bg-[#e8f0f2] rounded-full h-3 overflow-hidden">
             <div
               className="bg-gradient-to-r from-[#0057cc] to-[#9cd2d3] h-full rounded-full transition-all duration-300"
-              style={{ width: `${(matchCount / 5) * 100}%` }}
+              style={{ width: `${(activeExchangesCount / 5) * 100}%` }}
             />
           </div>
           <p className="text-xs text-[#4a4a4a] mt-2 text-right">
-            {matchCount}/5
+            {activeExchangesCount}/5
           </p>
         </div>
 

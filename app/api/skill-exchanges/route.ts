@@ -83,38 +83,36 @@ export async function POST(request: NextRequest) {
   }
 }
 
+// app/api/skill-exchanges/route.ts
+
+// ... (POST se mantiene igual)
+
 export async function GET(request: NextRequest) {
   try {
     const supabase = await createClient();
-    const { data: sessionData, error: userError } =
-      await supabase.auth.getUser();
-
-    if (userError || !sessionData.user) {
+    const { data: sessionData } = await supabase.auth.getUser();
+    if (!sessionData.user)
       return NextResponse.json({ error: "No autenticado" }, { status: 401 });
-    }
 
     const userId = sessionData.user.id;
     const { searchParams } = new URL(request.url);
-    const type = searchParams.get("type"); // 'received', 'sent', 'history'
+    const type = searchParams.get("type");
 
-    let query = supabase.from("skill_exchanges").select(
-      `
-        id,
-        sender_id,
-        receiver_id,
-        status,
-        created_at,
-        updated_at,
-        sender_profile:profiles!skill_exchanges_sender_id_fkey(id, full_name, avatar_url, career),
-        receiver_profile:profiles!skill_exchanges_receiver_id_fkey(id, full_name, avatar_url, career)
-      `,
-    );
+    let query = supabase.from("skill_exchanges").select(`
+        id, sender_id, receiver_id, status, created_at,
+        sender_profile:profiles!skill_exchanges_sender_id_fkey(id, full_name, avatar_url, career, gpa),
+        receiver_profile:profiles!skill_exchanges_receiver_id_fkey(id, full_name, avatar_url, career, gpa)
+    `);
 
     if (type === "received") {
       query = query.eq("receiver_id", userId).eq("status", "pending");
     } else if (type === "sent") {
-      // TODAS las solicitudes enviadas (pending, accepted, rejected, etc)
       query = query.eq("sender_id", userId);
+    } else if (type === "active") {
+      // Intercambios activos (accepted) desde ambas perspectivas
+      query = query
+        .or(`sender_id.eq.${userId},receiver_id.eq.${userId}`)
+        .eq("status", "accepted");
     } else if (type === "history") {
       query = query.or(
         `and(sender_id.eq.${userId},status.in.(completed,rejected,expired)),and(receiver_id.eq.${userId},status.in.(completed,rejected,expired))`,
@@ -124,97 +122,78 @@ export async function GET(request: NextRequest) {
     const { data, error } = await query.order("created_at", {
       ascending: false,
     });
-
-    if (error) {
+    if (error)
       return NextResponse.json({ error: error.message }, { status: 400 });
-    }
 
-    // Transformar la respuesta para que el cliente tenga 'profiles' en lugar de sender_profile/receiver_profile
+    // TRANSFORMACIÓN: Siempre poner el perfil de la OTRA persona en 'profiles'
     const transformedData = (data || []).map((exchange: any) => {
-      if (type === "sent") {
-        return {
-          ...exchange,
-          profiles: exchange.receiver_profile,
-        };
-      } else if (type === "received") {
-        return {
-          ...exchange,
-          profiles: exchange.sender_profile,
-        };
-      }
-      return exchange;
+      const isSender = exchange.sender_id === userId;
+      return {
+        ...exchange,
+        profiles: isSender
+          ? exchange.receiver_profile
+          : exchange.sender_profile,
+      };
     });
 
-    return NextResponse.json({ data: transformedData }, { status: 200 });
+    return NextResponse.json({ data: transformedData });
   } catch (error) {
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Error desconocido" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Error servidor" }, { status: 500 });
   }
 }
 
 export async function PATCH(request: NextRequest) {
   try {
     const supabase = await createClient();
-    const { data: sessionData, error: userError } =
-      await supabase.auth.getUser();
-
-    if (userError || !sessionData.user) {
+    const { data: sessionData } = await supabase.auth.getUser();
+    if (!sessionData.user)
       return NextResponse.json({ error: "No autenticado" }, { status: 401 });
-    }
 
     const userId = sessionData.user.id;
     const { exchangeId, newStatus } = await request.json();
 
-    if (!exchangeId || !newStatus) {
-      return NextResponse.json(
-        { error: "exchangeId y newStatus son requeridos" },
-        { status: 400 },
-      );
-    }
-
-    // Obtener el intercambio para verificar permisos
     const { data: exchange } = await supabase
       .from("skill_exchanges")
       .select("*")
       .eq("id", exchangeId)
       .maybeSingle();
 
-    if (!exchange) {
-      return NextResponse.json(
-        { error: "Intercambio no encontrado" },
-        { status: 404 },
-      );
+    if (!exchange)
+      return NextResponse.json({ error: "No encontrado" }, { status: 404 });
+
+    const isReceiver = exchange.receiver_id === userId;
+    const isSender = exchange.sender_id === userId;
+
+    let allowed = false;
+
+    // LÓGICA DE PERMISOS MEJORADA
+    if (newStatus === "accepted") {
+      allowed = isReceiver; // Solo el que recibe puede aceptar
+    } else if (newStatus === "rejected") {
+      // El receptor puede rechazar (Ignorar)
+      // El emisor puede rechazar (Cancelar) SOLO si aún está pendiente
+      allowed = isReceiver || (isSender && exchange.status === "pending");
+    } else if (newStatus === "completed") {
+      // Ambos pueden completar el intercambio si está actualmente accepted
+      allowed = (isReceiver || isSender) && exchange.status === "accepted";
     }
 
-    // Verificar que el usuario sea el receiver para aceptar/rechazar
-    if (exchange.receiver_id !== userId) {
+    if (!allowed) {
       return NextResponse.json(
-        { error: "No tienes permiso para actualizar este intercambio" },
+        { error: "No tienes permiso para esta acción" },
         { status: 403 },
       );
     }
 
     const { data, error } = await supabase
       .from("skill_exchanges")
-      .update({
-        status: newStatus,
-        updated_at: new Date().toISOString(),
-      })
+      .update({ status: newStatus, updated_at: new Date().toISOString() })
       .eq("id", exchangeId)
       .select()
       .single();
 
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 400 });
-    }
-
-    return NextResponse.json({ success: true, data }, { status: 200 });
+    return NextResponse.json({ success: true, data });
   } catch (error) {
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Error desconocido" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Error" }, { status: 500 });
   }
 }
