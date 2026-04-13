@@ -16,6 +16,7 @@ interface TimeSlot {
 
 interface UserCardProps {
   userId: string;
+  currentUserId?: string;
   name: string;
   avatarUrl?: string;
   skill: string;
@@ -36,6 +37,8 @@ interface UserCardProps {
 }
 
 export function UserCard({
+  userId,
+  currentUserId,
   name,
   avatarUrl,
   skill,
@@ -166,6 +169,8 @@ export function UserCard({
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         name={name}
+        userId={userId}
+        currentUserId={currentUserId}
         avatarUrl={avatarUrl}
         skills={defaultSkills}
         availability={defaultAvailability}

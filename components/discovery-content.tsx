@@ -30,6 +30,7 @@ interface DiscoveryContentProps {
   allCategories: string[];
   allShifts: string[];
   matchCount?: number;
+  currentUserId?: string;
   skillMap: Record<string, Skill>;
 }
 
@@ -39,6 +40,7 @@ export function DiscoveryContent({
   allCategories,
   allShifts,
   matchCount = 0,
+  currentUserId,
   skillMap,
 }: DiscoveryContentProps) {
   const [searchQuery, setSearchQuery] = useState("");
@@ -206,6 +208,7 @@ export function DiscoveryContent({
                   <UserCard
                     key={`${user.id}-${user.skill}`}
                     userId={user.id}
+                    currentUserId={currentUserId}
                     name={user.name}
                     avatarUrl={user.avatarUrl}
                     skill={user.skill}
@@ -230,6 +233,7 @@ export function DiscoveryContent({
                   <UserCard
                     key={`${user.id}-${user.skill}`}
                     userId={user.id}
+                    currentUserId={currentUserId}
                     name={user.name}
                     avatarUrl={user.avatarUrl}
                     skill={user.skill}
@@ -278,6 +282,7 @@ export function DiscoveryContent({
                     <UserCard
                       key={`${user.id}-${user.skill}`}
                       userId={user.id}
+                      currentUserId={currentUserId}
                       name={user.name}
                       avatarUrl={user.avatarUrl}
                       skill={user.skill}
@@ -311,6 +316,7 @@ export function DiscoveryContent({
                 <UserCard
                   key={`${user.id}-${user.skill}`}
                   userId={user.id}
+                  currentUserId={currentUserId}
                   name={user.name}
                   avatarUrl={user.avatarUrl}
                   skill={user.skill}

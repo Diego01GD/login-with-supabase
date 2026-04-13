@@ -261,7 +261,7 @@ export default async function main() {
 
           <div className="md:text-xl text-[#114c5f] font-bold flex items-center gap-10">
             <div className="flex gap-8">
-              <Link href="/protected/Sexo">
+              <Link href="/protected/swap">
                 <Repeat
                   className="hover:scale-110 transition-transform"
                   size={26}
@@ -290,6 +290,7 @@ export default async function main() {
           allCategories={allCategoriesArray}
           allShifts={allShiftsArray}
           matchCount={sortedMatches.length}
+          currentUserId={userId}
           skillMap={skillMap}
         />
       </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { X, Star, Code2, Music, Globe, Briefcase, Award } from "lucide-react";
 
@@ -8,6 +8,8 @@ interface UserDetailModalProps {
   isOpen: boolean;
   onClose: () => void;
   name: string;
+  userId?: string;
+  currentUserId?: string;
   avatarUrl?: string;
   skills: Array<{
     name: string;
@@ -62,6 +64,8 @@ export function UserDetailModal({
   isOpen,
   onClose,
   name,
+  userId,
+  currentUserId,
   avatarUrl,
   skills,
   availability,
@@ -69,6 +73,11 @@ export function UserDetailModal({
 }: UserDetailModalProps) {
   const modalRef = useRef<HTMLDivElement>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [message, setMessage] = useState<{
+    type: "success" | "error";
+    text: string;
+  } | null>(null);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -84,6 +93,51 @@ export function UserDetailModal({
       };
     }
   }, [isOpen, onClose]);
+
+  const handleMakeMatch = async () => {
+    if (!userId || !currentUserId) {
+      setMessage({ type: "error", text: "Error: Usuario no identificado" });
+      return;
+    }
+
+    setIsLoading(true);
+    setMessage(null);
+
+    try {
+      const response = await fetch("/api/skill-exchanges", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          receiverId: userId,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setMessage({
+          type: "error",
+          text: data.error || "Error al crear intercambio",
+        });
+        return;
+      }
+
+      setMessage({ type: "success", text: "¡Solicitud enviada exitosamente!" });
+      setTimeout(() => {
+        onClose();
+        setMessage(null);
+      }, 2000);
+    } catch (error) {
+      setMessage({
+        type: "error",
+        text: error instanceof Error ? error.message : "Error desconocido",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   if (!isOpen) return null;
 
@@ -273,9 +327,26 @@ export function UserDetailModal({
           </div>
 
           {/* Botón Hacer Match */}
-          <button className="w-full bg-[#0057cc] hover:bg-[#004bb3] text-white font-bold py-3 rounded-2xl transition-colors mb-6">
-            Hacer Match
-          </button>
+          <div className="space-y-4">
+            {message && (
+              <div
+                className={`p-3 rounded-lg text-sm font-medium ${
+                  message.type === "success"
+                    ? "bg-green-50 text-green-700 border border-green-200"
+                    : "bg-red-50 text-red-700 border border-red-200"
+                }`}
+              >
+                {message.text}
+              </div>
+            )}
+            <button
+              onClick={handleMakeMatch}
+              disabled={isLoading}
+              className="w-full bg-[#0057cc] hover:bg-[#004bb3] disabled:bg-gray-400 text-white font-bold py-3 rounded-2xl transition-colors"
+            >
+              {isLoading ? "Enviando solicitud..." : "Hacer Match"}
+            </button>
+          </div>
         </div>
       </div>
     </div>
