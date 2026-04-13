@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import Image from "next/image";
+import Link from "next/link";
 
 type Profile = {
   full_name: string;
@@ -130,9 +131,18 @@ export default async function ProtectedPage() {
   const reputation = "N/A";
 
   return (
-    <div className="min-h-screen bg-white rounded-2xl shadow-2xl p-6 md:p-10 font-gentium">
-      <div className="max-w-7xl mx-auto space-y-8">
-        <header className="bg-white rounded-[2rem] p-6 md:p-8 shadow-lg border border-[#d7e5ef] flex flex-col md:flex-row justify-between items-start gap-6">
+    <div className="min-h-screen font-gentium mt-7">
+      <div className="w-full text-right">
+        <Link
+            href="/protected/"
+            className="text-[#0057cc] hover:text-[#004499] font-semibold mb-8 inline-block"
+          >
+            ← Volver a la ventana principal
+          </Link>
+      </div>
+      <div className="max-w-full mx-auto bg-white space-y-8 p-6 md:p-12">
+        
+        <header className="bg-white rounded-[2rem] p-6 md:p-8 shadow-lg border border-[#d7e5ef] flex flex-col md:flex-row justify-between items-start gap-6 relative">
           <div className="flex items-start gap-5">
             <div className="w-28 h-28 rounded-full overflow-hidden border-4 border-[#3983A6] bg-[#eff6ff]">
               {typedProfile.avatar_url ? (
@@ -161,7 +171,6 @@ export default async function ProtectedPage() {
               </p>
             </div>
           </div>
-
         </header>
 
         <section className="grid grid-cols-1 md:grid-cols-3 gap-5">
@@ -267,6 +276,16 @@ export default async function ProtectedPage() {
             )}
           </div>
         </section>
+
+        {/* Botón Editar */}
+        <div className="flex justify-center mt-8">
+          <Link
+            href="/protected/profile/edit"
+            className="bg-[#0057cc] hover:bg-[#004499] text-white px-8 py-3 rounded-lg font-bold text-lg transition-colors"
+          >
+            Editar Perfil
+          </Link>
+        </div>
       </div>
     </div>
   );
