@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { unstable_noStore } from "next/cache";
 import { ProtectedPageClient } from "@/components/protected-page-client";
 
+// Definición de tipos basada en tu estructura de base de datos
 type Profile = {
   id: string;
   full_name: string;
@@ -86,34 +87,29 @@ export default async function main() {
     redirect("/auth/complete-profile");
   }
 
-  // Obtener intereses del usuario logueado
+  // Lógica de Matching y obtención de datos [cite: 1]
   const { data: userInterests } = await supabase
     .from("user_interests")
     .select("skill_id")
     .eq("profile_id", userId);
 
-  // Obtener todos los time slots
   const { data: timeSlots } = await supabase
     .from("time_slots")
     .select("id, range, shift");
 
-  // Obtener skills para filtrado
   const { data: allSkills } = await supabase
     .from("skills")
     .select("id, name, category");
 
-  // Obtener todos los perfiles (excepto el actual) que tienen skills
   const { data: otherProfiles } = await supabase
     .from("profiles")
     .select("id, full_name, avatar_url, career, gpa")
     .neq("id", userId);
 
-  // Obtener todos los user_skills de otros usuarios
   const { data: allUserSkills } = await supabase
     .from("user_skills")
     .select("profile_id, skill_id, level");
 
-  // Obtener disponibilidad de todos los usuarios
   const { data: allAvailability } = await supabase
     .from("user_availability")
     .select("profile_id, slot_id, day");
@@ -138,30 +134,19 @@ export default async function main() {
     typedAllSkills.map((s) => [s.id, s]),
   ) as Record<string, Skill>;
 
-  // Obtener IDs de intereses del usuario
   const userInterestIds = typedUserInterests.map((i) => i.skill_id);
-
-  // Obtener todos los shifts únicos
   const allShiftsSet = new Set(typedTimeSlots.map((ts) => ts.shift));
   const allShiftsArray = Array.from(allShiftsSet);
-
-  // Obtener todas las categorías únicas
   const allCategoriesSet = new Set(typedAllSkills.map((s) => s.category));
   const allCategoriesArray = Array.from(allCategoriesSet).sort();
 
-  // Crear matched users SIMPLE: Solo usuarios que ofrecen habilidades que el usuario busca
   const matchedUsers: MatchedUser[] = [];
-
-  // FALLBACK: Usuarios con habilidades que NO son de interés del usuario
   const fallbackUsers: MatchedUser[] = [];
 
   typedOtherProfiles.forEach((otherProfile) => {
-    // Obtener skills que ofrece este usuario
     const offeringSkills = typedAllUserSkills.filter(
       (us) => us.profile_id === otherProfile.id,
     );
-
-    // Obtener disponibilidad de este usuario
     const otherAvailability = typedAllAvailability.filter(
       (ua) => ua.profile_id === otherProfile.id,
     );
@@ -169,7 +154,6 @@ export default async function main() {
       otherAvailability.map((ua) => slotMap[ua.slot_id]?.shift).filter(Boolean),
     );
 
-    // Procesar cada skill del usuario
     offeringSkills.forEach((skill) => {
       const skillInfo = skillMap[skill.skill_id];
       const firstOtherSlot = Array.from(otherAvailability)
@@ -179,7 +163,6 @@ export default async function main() {
         ? firstOtherSlot.range
         : "Sin horario definido";
 
-      // Construir array de disponibilidad agrupado por día
       const availabilityByDay = new Map<string, string[]>();
       otherAvailability.forEach((ua) => {
         const timeSlot = slotMap[ua.slot_id];
@@ -213,17 +196,14 @@ export default async function main() {
         availability: availabilityArray,
       };
 
-      // Si es habilidad de interés, agregar a matches
       if (userInterestIds.includes(skill.skill_id)) {
         matchedUsers.push(userData);
       } else {
-        // Si NO es habilidad de interés, agregar a fallback
         fallbackUsers.push(userData);
       }
     });
   });
 
-  // Ordenar por match score
   const sortedMatches = matchedUsers.sort((a, b) => {
     const scoreOrder = { perfect: 0, good: 1, fair: 2 };
     return (
@@ -232,19 +212,36 @@ export default async function main() {
     );
   });
 
-  // Obtener contador de intercambios activos (status = 'accepted')
+  // --- LÓGICA DE CONTADORES PARA NOTIFICACIONES --- [cite: 1]
+
+  // 1. Contador de intercambios activos
   const { count: activeExchangesCount } = await supabase
     .from("skill_exchanges")
     .select("*", { count: "exact", head: true })
     .or(`sender_id.eq.${userId},receiver_id.eq.${userId}`)
     .eq("status", "accepted");
 
-  // Obtener contador de solicitudes pendientes recibidas
+  // 2. Contador de solicitudes pendientes recibidas
   const { count: pendingReceivedCount } = await supabase
     .from("skill_exchanges")
     .select("*", { count: "exact", head: true })
     .eq("receiver_id", userId)
     .eq("status", "pending");
+
+  // 3. NUEVO: Contador de mensajes no leídos
+  const { data: userExchanges } = await supabase
+    .from("skill_exchanges")
+    .select("id")
+    .or(`sender_id.eq.${userId},receiver_id.eq.${userId}`);
+
+  const exchangeIds = userExchanges?.map((ex) => ex.id) || [];
+
+  const { count: unreadMessagesCount } = await supabase
+    .from("messages")
+    .select("*", { count: "exact", head: true })
+    .in("exchange_id", exchangeIds)
+    .neq("sender_id", userId)
+    .eq("is_read", false);
 
   return (
     <ProtectedPageClient
@@ -252,6 +249,7 @@ export default async function main() {
       userId={userId}
       activeExchangesCount={activeExchangesCount || 0}
       pendingReceivedCount={pendingReceivedCount || 0}
+      unreadMessagesCount={unreadMessagesCount || 0}
       matches={sortedMatches}
       fallbackUsers={fallbackUsers}
       allCategories={allCategoriesArray}

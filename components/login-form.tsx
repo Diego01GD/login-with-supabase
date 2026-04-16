@@ -10,6 +10,7 @@ import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react"; // Añadido useEffect
 import { Mail, Eye, EyeOff, Loader2 } from "lucide-react";
 import ImgP from "@/public/images/login-illustration.png";
+import logoImage from "@/public/images/logo.png";
 
 export function LoginForm() {
   const [email, setEmail] = useState("");
@@ -68,7 +69,22 @@ export function LoginForm() {
   };
 
   return (
-    <div className="bg-white rounded-[2.5rem] shadow-2xl overflow-hidden p-8 md:p-14 border border-[#9cd2d3]/20">
+    <div className="bg-white rounded-[2.5rem] shadow-2xl overflow-hidden p-8 md:p-12 border border-[#9cd2d3]/20">
+      <div className="w-full px-0 py-0 flex items-center justify-between bg-transparent mb-8 -mt-3">
+        {/* Logo SkillSwap */}
+        <Link href="/" className="flex items-center gap-2">
+          <Image src={logoImage} alt="SkillSwap Logo" className="w-32" />
+          <span className="text-2xl font-bold text-[#114c5f]">SkillSwap</span>
+        </Link>
+
+        {/* Botón Registrarse */}
+        <Link
+          href="/auth/sign-up"
+          className="bg-[#4a7c92] hover:bg-[#3d6678] text-white px-6 py-2 rounded-lg font-medium text-lg transition-colors shadow-sm"
+        >
+          Registrarse
+        </Link>
+      </div>
       <h1 className="text-4xl md:text-5xl font-bold text-[#114c5f] text-center mb-12">
         Iniciar Sesión en SkillSwap
       </h1>

@@ -140,7 +140,7 @@ export function ForgotPasswordForm({
     if (activeBlock) {
       setBlockedUntil(activeBlock);
       setError(
-        `Has excedido el número de solicitudes. Intenta de nuevo en ${formatCountdown(activeBlock - Date.now())}.`,
+        `Has excedido el número de solicitudes. Intenta de nuevo en ${formatCountdown(activeBlock - Date.now())} Minutos.`,
       );
       return;
     }
@@ -185,7 +185,7 @@ export function ForgotPasswordForm({
       if (info.blockedUntil) {
         setBlockedUntil(info.blockedUntil);
         setError(
-          `Excediste ${MAX_ATTEMPTS} solicitudes en ${ATTEMPT_WINDOW_MS / 60000} minutos. Vuelve a intentarlo en ${formatCountdown(info.blockedUntil - Date.now())}.`,
+          `Excediste ${MAX_ATTEMPTS} solicitudes en ${ATTEMPT_WINDOW_MS / 60000} minutos. Vuelve a intentarlo en ${formatCountdown(info.blockedUntil - Date.now())} minutos.`,
         );
         return;
       }

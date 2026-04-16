@@ -80,6 +80,14 @@ export default function SwapPageClient({
 
       {/* CUERPO DE LA PÁGINA: Título principal según la imagen */}
       <div className="w-full max-w-7xl mx-auto px-12 py-12">
+        <div className="w-full text-right">
+          <Link
+            href="/protected/"
+            className="text-[#0057cc] hover:text-[#004499] font-semibold mb-8 inline-block"
+          >
+            ← Volver a la ventana principal
+          </Link>
+        </div>
         <div className="mb-10">
           <h1 className="text-5xl font-black text-[#1a1a1a] tracking-tight">
             Gestión de solicitudes
