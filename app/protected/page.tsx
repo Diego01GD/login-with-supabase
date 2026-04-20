@@ -51,9 +51,15 @@ type MatchedUser = {
   skill: string;
   level: string;
   schedule: string;
+  scheduleCount: number;
   matchScore: "perfect" | "good" | "fair";
   shift: string;
   availability: Array<{ day: string; timeSlots: string[] }>;
+};
+
+type TrendingSkill = {
+  skill: string;
+  count: number;
 };
 
 export default async function main() {
@@ -135,6 +141,16 @@ export default async function main() {
   ) as Record<string, Skill>;
 
   const userInterestIds = typedUserInterests.map((i) => i.skill_id);
+  const preferredSlotIds = Array.from(
+    new Set(
+      typedAllAvailability
+        .filter((ua) => ua.profile_id === userId)
+        .map((ua) => ua.slot_id),
+    ),
+  );
+  const preferredSlotRank = new Map<string, number>(
+    preferredSlotIds.map((slotId, index) => [slotId, index]),
+  );
   const allShiftsSet = new Set(typedTimeSlots.map((ts) => ts.shift));
   const allShiftsArray = Array.from(allShiftsSet);
   const allCategoriesSet = new Set(typedAllSkills.map((s) => s.category));
@@ -150,18 +166,35 @@ export default async function main() {
     const otherAvailability = typedAllAvailability.filter(
       (ua) => ua.profile_id === otherProfile.id,
     );
+
+    const uniqueOtherSlotIds = Array.from(
+      new Set(
+        otherAvailability
+          .map((ua) => ua.slot_id)
+          .filter((slotId) => Boolean(slotMap[slotId])),
+      ),
+    );
+
+    // Prioriza el horario del otro usuario que esté más cercano a los horarios preferidos del usuario actual.
+    const sortedByPreference = [...uniqueOtherSlotIds].sort((a, b) => {
+      const rankA = preferredSlotRank.get(a) ?? Number.MAX_SAFE_INTEGER;
+      const rankB = preferredSlotRank.get(b) ?? Number.MAX_SAFE_INTEGER;
+      return rankA - rankB;
+    });
+
+    const bestSlot = sortedByPreference[0]
+      ? slotMap[sortedByPreference[0]]
+      : undefined;
+
+    const scheduleDisplay = bestSlot?.range || "Sin horario definido";
+    const scheduleCount = uniqueOtherSlotIds.length;
+
     const otherShifts = new Set(
       otherAvailability.map((ua) => slotMap[ua.slot_id]?.shift).filter(Boolean),
     );
 
     offeringSkills.forEach((skill) => {
       const skillInfo = skillMap[skill.skill_id];
-      const firstOtherSlot = Array.from(otherAvailability)
-        .map((ua) => slotMap[ua.slot_id])
-        .filter(Boolean)[0];
-      const scheduleDisplay = firstOtherSlot
-        ? firstOtherSlot.range
-        : "Sin horario definido";
 
       const availabilityByDay = new Map<string, string[]>();
       otherAvailability.forEach((ua) => {
@@ -191,8 +224,9 @@ export default async function main() {
         skill: skillInfo?.name || skill.skill_id,
         level: skill.level,
         schedule: scheduleDisplay,
+        scheduleCount,
         matchScore: "fair" as const,
-        shift: Array.from(otherShifts)[0] || "Mañana",
+        shift: bestSlot?.shift || Array.from(otherShifts)[0] || "Mañana",
         availability: availabilityArray,
       };
 
@@ -211,6 +245,26 @@ export default async function main() {
       b.name.localeCompare(a.name)
     );
   });
+
+  // Ranking dinámico de habilidades en tendencia basado en la base de datos.
+  // Se cuenta cuántas personas (profile_id únicos) enseñan cada habilidad.
+  const trendMap = new Map<string, Set<string>>();
+
+  typedAllUserSkills.forEach((userSkill) => {
+    const skillName = skillMap[userSkill.skill_id]?.name;
+    if (!skillName) return;
+
+    if (!trendMap.has(skillName)) {
+      trendMap.set(skillName, new Set<string>());
+    }
+
+    trendMap.get(skillName)!.add(userSkill.profile_id);
+  });
+
+  const trendingSkills: TrendingSkill[] = Array.from(trendMap.entries())
+    .map(([skill, profiles]) => ({ skill, count: profiles.size }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 5);
 
   // --- LÓGICA DE CONTADORES PARA NOTIFICACIONES --- [cite: 1]
 
@@ -255,6 +309,7 @@ export default async function main() {
       allCategories={allCategoriesArray}
       allShifts={allShiftsArray}
       skillMap={skillMap}
+      trendingSkills={trendingSkills}
     />
   );
 }

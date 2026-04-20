@@ -28,8 +28,8 @@ export async function POST(request: NextRequest) {
     });
 
     const { data, error } = await supabase.auth.admin.listUsers({
-      query: email,
-      perPage: 100,
+      page: 1,
+      perPage: 1000,
     });
 
     if (error) {

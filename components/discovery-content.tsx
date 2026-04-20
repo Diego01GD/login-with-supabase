@@ -11,6 +11,7 @@ interface MatchedUser {
   skill: string;
   level: string;
   schedule: string;
+  scheduleCount: number;
   matchScore: "perfect" | "good" | "fair";
   shift: string;
   career: string;
@@ -24,6 +25,11 @@ interface Skill {
   category: string;
 }
 
+interface TrendingSkill {
+  skill: string;
+  count: number;
+}
+
 interface DiscoveryContentProps {
   matches: MatchedUser[];
   fallbackUsers: MatchedUser[];
@@ -34,6 +40,7 @@ interface DiscoveryContentProps {
   skillMap: Record<string, Skill>;
   activeExchangesCount?: number;
   pendingReceivedCount?: number;
+  trendingSkills?: TrendingSkill[];
 }
 
 export function DiscoveryContent({
@@ -44,19 +51,26 @@ export function DiscoveryContent({
   currentUserId,
   skillMap,
   activeExchangesCount = 0,
+  trendingSkills = [],
   // pendingReceivedCount = 0,
 }: DiscoveryContentProps) {
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState<string | undefined>();
+  const [selectedCategory, setSelectedCategory] = useState<
+    string | undefined
+  >();
   const [selectedShift, setSelectedShift] = useState<string | undefined>();
-  
+
   // NUEVOS ESTADOS PARA LOS FILTROS DEL MODAL
   const [selectedLevel, setSelectedLevel] = useState<string | undefined>();
-  const [selectedSkillName, setSelectedSkillName] = useState<string | undefined>();
+  const [selectedSkillName, setSelectedSkillName] = useState<
+    string | undefined
+  >();
 
   // EXTRAER NOMBRES ÚNICOS DE HABILIDADES DEL SKILLMAP
   const skillNames = useMemo(() => {
-    return Array.from(new Set(Object.values(skillMap).map(s => s.name))).sort();
+    return Array.from(
+      new Set(Object.values(skillMap).map((s) => s.name)),
+    ).sort();
   }, [skillMap]);
 
   const calculateRelevance = (user: MatchedUser, query: string): number => {
@@ -85,46 +99,91 @@ export function DiscoveryContent({
       const relevance = calculateRelevance(user, searchQuery);
       const matchesSearch = !searchQuery || relevance > 0;
       const skillCategory = getSkillCategory(user.skill);
-      const matchesCategory = !selectedCategory || skillCategory === selectedCategory;
+      const matchesCategory =
+        !selectedCategory || skillCategory === selectedCategory;
       const matchesShift = !selectedShift || user.shift === selectedShift;
-      
+
       // Nuevos filtros del modal
       const matchesLevel = !selectedLevel || user.level === selectedLevel;
-      const matchesSkillName = !selectedSkillName || user.skill === selectedSkillName;
+      const matchesSkillName =
+        !selectedSkillName || user.skill === selectedSkillName;
 
-      return matchesSearch && matchesCategory && matchesShift && matchesLevel && matchesSkillName;
+      return (
+        matchesSearch &&
+        matchesCategory &&
+        matchesShift &&
+        matchesLevel &&
+        matchesSkillName
+      );
     });
 
     if (searchQuery) {
-      results.sort((a, b) => calculateRelevance(b, searchQuery) - calculateRelevance(a, searchQuery));
+      results.sort(
+        (a, b) =>
+          calculateRelevance(b, searchQuery) -
+          calculateRelevance(a, searchQuery),
+      );
     }
     return results;
-  }, [matches, searchQuery, selectedCategory, selectedShift, selectedLevel, selectedSkillName, getSkillCategory]);
+  }, [
+    matches,
+    searchQuery,
+    selectedCategory,
+    selectedShift,
+    selectedLevel,
+    selectedSkillName,
+    getSkillCategory,
+  ]);
 
   const filteredFallback = useMemo(() => {
     const results = fallbackUsers.filter((user) => {
       const relevance = calculateRelevance(user, searchQuery);
       const matchesSearch = !searchQuery || relevance > 0;
       const skillCategory = getSkillCategory(user.skill);
-      const matchesCategory = !selectedCategory || skillCategory === selectedCategory;
+      const matchesCategory =
+        !selectedCategory || skillCategory === selectedCategory;
       const matchesShift = !selectedShift || user.shift === selectedShift;
-      
+
       // Nuevos filtros del modal
       const matchesLevel = !selectedLevel || user.level === selectedLevel;
-      const matchesSkillName = !selectedSkillName || user.skill === selectedSkillName;
+      const matchesSkillName =
+        !selectedSkillName || user.skill === selectedSkillName;
 
-      return matchesSearch && matchesCategory && matchesShift && matchesLevel && matchesSkillName;
+      return (
+        matchesSearch &&
+        matchesCategory &&
+        matchesShift &&
+        matchesLevel &&
+        matchesSkillName
+      );
     });
 
     if (searchQuery) {
-      results.sort((a, b) => calculateRelevance(b, searchQuery) - calculateRelevance(a, searchQuery));
+      results.sort(
+        (a, b) =>
+          calculateRelevance(b, searchQuery) -
+          calculateRelevance(a, searchQuery),
+      );
     }
     return results;
-  }, [fallbackUsers, searchQuery, selectedCategory, selectedShift, selectedLevel, selectedSkillName, getSkillCategory]);
+  }, [
+    fallbackUsers,
+    searchQuery,
+    selectedCategory,
+    selectedShift,
+    selectedLevel,
+    selectedSkillName,
+    getSkillCategory,
+  ]);
 
   const handleSearch = (
     query: string,
-    filters: { category?: string; shift?: string; level?: string; skillName?: string },
+    filters: {
+      category?: string;
+      shift?: string;
+      level?: string;
+      skillName?: string;
+    },
   ) => {
     setSearchQuery(query);
     setSelectedCategory(filters.category);
@@ -133,19 +192,13 @@ export function DiscoveryContent({
     setSelectedSkillName(filters.skillName);
   };
 
-  const hasActiveFilters = !!(searchQuery || selectedCategory || selectedShift || selectedLevel || selectedSkillName);
-
-  // ... (Resto de la lógica de trendingSkills y userSkillsMap se mantiene igual)
-  const trendingSkills = useMemo(() => {
-    const skillCounts = new Map<string, number>();
-    [...matches, ...fallbackUsers].forEach((user) => {
-      skillCounts.set(user.skill, (skillCounts.get(user.skill) || 0) + 1);
-    });
-    return Array.from(skillCounts.entries())
-      .map(([skill, count]) => ({ skill, count }))
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 5);
-  }, [matches, fallbackUsers]);
+  const hasActiveFilters = !!(
+    searchQuery ||
+    selectedCategory ||
+    selectedShift ||
+    selectedLevel ||
+    selectedSkillName
+  );
 
   const userSkillsMap = useMemo(() => {
     const map = new Map<string, Array<{ name: string; level: string }>>();
@@ -175,48 +228,122 @@ export function DiscoveryContent({
         {hasActiveFilters ? (
           filteredMatches.length > 0 ? (
             <div>
-              <h2 className="text-3xl font-bold text-[#114c5f] mb-8">Coincidencias ({filteredMatches.length})</h2>
+              <h2 className="text-3xl font-bold text-[#114c5f] mb-8">
+                Coincidencias ({filteredMatches.length})
+              </h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {filteredMatches.map((user) => (
-                  <UserCard key={`${user.id}-${user.skill}`} userId={user.id} currentUserId={currentUserId} name={user.name} avatarUrl={user.avatarUrl} skill={user.skill} level={user.level} schedule={user.schedule} matchScore={user.matchScore} skills={userSkillsMap.get(user.id)} career={user.career} gpa={user.gpa} dbAvailability={user.availability} />
+                  <UserCard
+                    key={`${user.id}-${user.skill}`}
+                    userId={user.id}
+                    currentUserId={currentUserId}
+                    name={user.name}
+                    avatarUrl={user.avatarUrl}
+                    skill={user.skill}
+                    level={user.level}
+                    schedule={user.schedule}
+                    scheduleCount={user.scheduleCount}
+                    matchScore={user.matchScore}
+                    skills={userSkillsMap.get(user.id)}
+                    career={user.career}
+                    gpa={user.gpa}
+                    dbAvailability={user.availability}
+                  />
                 ))}
               </div>
             </div>
           ) : filteredFallback.length > 0 ? (
             <div>
-              <h2 className="text-3xl font-bold text-[#114c5f] mb-8">Compañeros Disponibles ({filteredFallback.length})</h2>
+              <h2 className="text-3xl font-bold text-[#114c5f] mb-8">
+                Compañeros Disponibles ({filteredFallback.length})
+              </h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {filteredFallback.map((user) => (
-                  <UserCard key={`${user.id}-${user.skill}`} userId={user.id} currentUserId={currentUserId} name={user.name} avatarUrl={user.avatarUrl} skill={user.skill} level={user.level} schedule={user.schedule} matchScore={user.matchScore} skills={userSkillsMap.get(user.id)} career={user.career} gpa={user.gpa} dbAvailability={user.availability} />
+                  <UserCard
+                    key={`${user.id}-${user.skill}`}
+                    userId={user.id}
+                    currentUserId={currentUserId}
+                    name={user.name}
+                    avatarUrl={user.avatarUrl}
+                    skill={user.skill}
+                    level={user.level}
+                    schedule={user.schedule}
+                    scheduleCount={user.scheduleCount}
+                    matchScore={user.matchScore}
+                    skills={userSkillsMap.get(user.id)}
+                    career={user.career}
+                    gpa={user.gpa}
+                    dbAvailability={user.availability}
+                  />
                 ))}
               </div>
             </div>
           ) : (
             <div className="bg-white rounded-2xl p-12 text-center shadow-sm border border-[#9cd2d3]/20">
-              <h3 className="text-2xl font-bold text-[#114c5f] mb-4">Sin resultados</h3>
-              <p className="text-[#4a4a4a] text-lg">No encontramos compañeros que coincidan con tus criterios.</p>
+              <h3 className="text-2xl font-bold text-[#114c5f] mb-4">
+                Sin resultados
+              </h3>
+              <p className="text-[#4a4a4a] text-lg">
+                No encontramos compañeros que coincidan con tus criterios.
+              </p>
             </div>
           )
         ) : matches.length === 0 ? (
           <div>
             <div className="bg-white rounded-2xl p-12 text-center shadow-sm border border-[#9cd2d3]/20 mb-8">
-              <h3 className="text-2xl font-bold text-[#114c5f] mb-4">No hay coincidencias disponibles</h3>
-              <p className="text-[#4a4a4a] text-lg">Prueba buscando otras habilidades disponibles:</p>
+              <h3 className="text-2xl font-bold text-[#114c5f] mb-4">
+                No hay coincidencias disponibles
+              </h3>
+              <p className="text-[#4a4a4a] text-lg">
+                Prueba buscando otras habilidades disponibles:
+              </p>
             </div>
             {fallbackUsers.length > 0 && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {fallbackUsers.map((user) => (
-                  <UserCard key={`${user.id}-${user.skill}`} userId={user.id} currentUserId={currentUserId} name={user.name} avatarUrl={user.avatarUrl} skill={user.skill} level={user.level} schedule={user.schedule} matchScore={user.matchScore} skills={userSkillsMap.get(user.id)} career={user.career} gpa={user.gpa} dbAvailability={user.availability} />
+                  <UserCard
+                    key={`${user.id}-${user.skill}`}
+                    userId={user.id}
+                    currentUserId={currentUserId}
+                    name={user.name}
+                    avatarUrl={user.avatarUrl}
+                    skill={user.skill}
+                    level={user.level}
+                    schedule={user.schedule}
+                    scheduleCount={user.scheduleCount}
+                    matchScore={user.matchScore}
+                    skills={userSkillsMap.get(user.id)}
+                    career={user.career}
+                    gpa={user.gpa}
+                    dbAvailability={user.availability}
+                  />
                 ))}
               </div>
             )}
           </div>
         ) : (
           <div>
-            <h2 className="text-3xl font-bold text-[#114c5f] mb-8">Compañeros Disponibles ({matches.length})</h2>
+            <h2 className="text-3xl font-bold text-[#114c5f] mb-8">
+              Compañeros Disponibles ({matches.length})
+            </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {matches.map((user) => (
-                <UserCard key={`${user.id}-${user.skill}`} userId={user.id} currentUserId={currentUserId} name={user.name} avatarUrl={user.avatarUrl} skill={user.skill} level={user.level} schedule={user.schedule} matchScore={user.matchScore} skills={userSkillsMap.get(user.id)} career={user.career} gpa={user.gpa} dbAvailability={user.availability} />
+                <UserCard
+                  key={`${user.id}-${user.skill}`}
+                  userId={user.id}
+                  currentUserId={currentUserId}
+                  name={user.name}
+                  avatarUrl={user.avatarUrl}
+                  skill={user.skill}
+                  level={user.level}
+                  schedule={user.schedule}
+                  scheduleCount={user.scheduleCount}
+                  matchScore={user.matchScore}
+                  skills={userSkillsMap.get(user.id)}
+                  career={user.career}
+                  gpa={user.gpa}
+                  dbAvailability={user.availability}
+                />
               ))}
             </div>
           </div>
@@ -225,24 +352,48 @@ export function DiscoveryContent({
 
       <div className="lg:col-span-1 space-y-8">
         <div className="bg-white rounded-2xl p-6 shadow-sm border border-[#9cd2d3]/20">
-          <h3 className="text-2xl font-bold text-[#114c5f] mb-3">Estado de Intercambios</h3>
-          <p className="text-[#4a4a4a] mb-4">Tienes <span className="font-bold text-[#0057cc]">{activeExchangesCount}</span> de 5 activos</p>
+          <h3 className="text-2xl font-bold text-[#114c5f] mb-3">
+            Estado de Intercambios
+          </h3>
+          <p className="text-[#4a4a4a] mb-4">
+            Tienes{" "}
+            <span className="font-bold text-[#0057cc]">
+              {activeExchangesCount}
+            </span>{" "}
+            de 5 activos
+          </p>
           <div className="w-full bg-[#e8f0f2] rounded-full h-3 overflow-hidden">
-            <div className="bg-gradient-to-r from-[#0057cc] to-[#9cd2d3] h-full rounded-full transition-all duration-300" style={{ width: `${(activeExchangesCount / 5) * 100}%` }} />
+            <div
+              className="bg-gradient-to-r from-[#0057cc] to-[#9cd2d3] h-full rounded-full transition-all duration-300"
+              style={{ width: `${(activeExchangesCount / 5) * 100}%` }}
+            />
           </div>
-          <p className="text-xs text-[#4a4a4a] mt-2 text-right">{activeExchangesCount}/5</p>
+          <p className="text-xs text-[#4a4a4a] mt-2 text-right">
+            {activeExchangesCount}/5
+          </p>
         </div>
 
         <div className="bg-white rounded-2xl p-6 shadow-sm border border-[#9cd2d3]/20">
-          <h3 className="text-2xl font-bold text-[#114c5f] mb-4">Habilidades en Tendencia</h3>
+          <h3 className="text-2xl font-bold text-[#114c5f] mb-4">
+            Habilidades en Tendencia
+          </h3>
           <div className="space-y-3">
             {trendingSkills.map(({ skill, count }, index) => (
-              <div key={skill} className="flex items-center justify-between p-3 bg-[#f7f3e7] rounded-xl hover:bg-[#f0eadc] transition-colors">
+              <div
+                key={skill}
+                className="flex items-center justify-between p-3 bg-[#f7f3e7] rounded-xl hover:bg-[#f0eadc] transition-colors"
+              >
                 <div className="flex items-center gap-3">
-                  <span className="text-sm font-bold text-[#0057cc] bg-white rounded-full w-6 h-6 flex items-center justify-center">{index + 1}</span>
-                  <span className="text-sm font-semibold text-[#114c5f]">{skill}</span>
+                  <span className="text-sm font-bold text-[#0057cc] bg-white rounded-full w-6 h-6 flex items-center justify-center">
+                    {index + 1}
+                  </span>
+                  <span className="text-sm font-semibold text-[#114c5f]">
+                    {skill}
+                  </span>
                 </div>
-                <span className="text-xs text-[#4a4a4a] bg-white px-2 py-1 rounded-lg">{count} personas</span>
+                <span className="text-xs text-[#4a4a4a] bg-white px-2 py-1 rounded-lg">
+                  {count} personas
+                </span>
               </div>
             ))}
           </div>

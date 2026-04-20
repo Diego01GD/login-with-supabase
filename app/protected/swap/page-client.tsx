@@ -6,7 +6,7 @@ import Image from "next/image";
 import LogoSS from "@/public/images/logo.png";
 import { UserDropdownMenu } from "@/components/user-dropdown-menu";
 import { SwapTabsContent } from "@/components/swap-tabs-content";
-import { MessageSquare, Repeat } from "lucide-react";
+import { MessageCircleHeart, MessageSquare, Repeat } from "lucide-react";
 
 interface SwapPageClientProps {
   userId: string;
@@ -65,6 +65,12 @@ export default function SwapPageClient({
             </Link>
             <Link href="/protected/messages" title="Mensajes">
               <MessageSquare
+                className="hover:scale-110 transition-transform cursor-pointer hover:text-[#0057cc]"
+                size={26}
+              />
+            </Link>
+            <Link href="/protected/feedback" title="Mi Reputación">
+              <MessageCircleHeart
                 className="hover:scale-110 transition-transform cursor-pointer hover:text-[#0057cc]"
                 size={26}
               />

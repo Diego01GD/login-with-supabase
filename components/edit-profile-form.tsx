@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { X, Plus } from "lucide-react";
 import { NotificationCard } from "@/components/notification-card";
@@ -47,7 +47,8 @@ interface EditProfileFormProps {
   userCareer?: string;
 }
 
-const LEVELS = ["Básico", "Intermedio", "Avanzado", "Experto"];
+const LEVELS = ["Básico", "Intermedio", "Avanzado"];
+const MAX_SKILLS_PER_SECTION = 5;
 
 export function EditProfileForm({
   userSkills: initialSkills,
@@ -99,6 +100,13 @@ export function EditProfileForm({
     type: "success" | "error";
     text: string;
   } | null>(null);
+  const [showLeaveModal, setShowLeaveModal] = useState(false);
+  const [pendingNavigationHref, setPendingNavigationHref] = useState<
+    string | null
+  >(null);
+
+  const isConfirmingLeaveRef = useRef(false);
+  const isInternalHistoryUpdateRef = useRef(false);
 
   const supabase = createClient();
 
@@ -107,8 +115,155 @@ export function EditProfileForm({
     return slot ? slot.range : slotId;
   };
 
+  const getVisibleSkillsCount = () =>
+    skills.filter((s) => !skillsToDelete.includes(s.id)).length +
+    pendingSkillAdds.length;
+
+  const getVisibleInterestsCount = () =>
+    interests.filter((i) => !interestsToDelete.includes(i.id)).length +
+    pendingInterestAdds.length;
+
+  const hasUnsavedChanges = useMemo(
+    () =>
+      pendingSkillAdds.length > 0 ||
+      pendingInterestAdds.length > 0 ||
+      pendingAvailabilityAdds.length > 0 ||
+      skillsToDelete.length > 0 ||
+      interestsToDelete.length > 0 ||
+      availabilityToDelete.length > 0 ||
+      editGPA !== (userGPA?.toString() || "") ||
+      editCareer !== (userCareer || ""),
+    [
+      pendingSkillAdds.length,
+      pendingInterestAdds.length,
+      pendingAvailabilityAdds.length,
+      skillsToDelete.length,
+      interestsToDelete.length,
+      availabilityToDelete.length,
+      editGPA,
+      editCareer,
+      userGPA,
+      userCareer,
+    ],
+  );
+
+  const getVisibleAvailability = () => [
+    ...availability.filter((a) => !availabilityToDelete.includes(a.id)),
+    ...pendingAvailabilityAdds.map((a, idx) => ({
+      id: `new-avail-${idx}`,
+      day: a.day,
+      slot_id: a.slot_id,
+    })),
+  ];
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const originalPushState = window.history.pushState.bind(window.history);
+    const originalReplaceState = window.history.replaceState.bind(
+      window.history,
+    );
+
+    const resolveHref = (url?: string | URL | null) => {
+      if (!url) return null;
+      try {
+        return new URL(String(url), window.location.href).href;
+      } catch {
+        return null;
+      }
+    };
+
+    const shouldBlockNavigation = (nextHref?: string | null) => {
+      if (!hasUnsavedChanges || isConfirmingLeaveRef.current) return false;
+      if (!nextHref) return false;
+      if (nextHref === window.location.href) return false;
+      return true;
+    };
+
+    window.history.pushState = function (data, title, url) {
+      const nextHref = resolveHref(url);
+      if (
+        !isInternalHistoryUpdateRef.current &&
+        shouldBlockNavigation(nextHref)
+      ) {
+        setPendingNavigationHref(nextHref);
+        setShowLeaveModal(true);
+        return;
+      }
+      return originalPushState(data, title, url);
+    };
+
+    window.history.replaceState = function (data, title, url) {
+      const nextHref = resolveHref(url);
+      if (
+        !isInternalHistoryUpdateRef.current &&
+        shouldBlockNavigation(nextHref)
+      ) {
+        setPendingNavigationHref(nextHref);
+        setShowLeaveModal(true);
+        return;
+      }
+      return originalReplaceState(data, title, url);
+    };
+
+    // Evita salida accidental al usar atrás del navegador.
+    isInternalHistoryUpdateRef.current = true;
+    originalPushState({ editProfileGuard: true }, "", window.location.href);
+    isInternalHistoryUpdateRef.current = false;
+
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (!hasUnsavedChanges || isConfirmingLeaveRef.current) return;
+      event.preventDefault();
+      event.returnValue = "";
+    };
+
+    const handlePopState = () => {
+      if (!hasUnsavedChanges || isConfirmingLeaveRef.current) return;
+      isInternalHistoryUpdateRef.current = true;
+      originalPushState({ editProfileGuard: true }, "", window.location.href);
+      isInternalHistoryUpdateRef.current = false;
+      setPendingNavigationHref("__back__");
+      setShowLeaveModal(true);
+    };
+
+    const handleDocumentClick = (event: MouseEvent) => {
+      if (!hasUnsavedChanges || isConfirmingLeaveRef.current) return;
+      const target = event.target as HTMLElement | null;
+      const link = target?.closest("a[href]") as HTMLAnchorElement | null;
+      if (!link) return;
+
+      const href = link.getAttribute("href");
+      if (!href) return;
+      if (href.startsWith("#")) return;
+      if (href === window.location.pathname + window.location.search) return;
+
+      event.preventDefault();
+      setPendingNavigationHref(link.href);
+      setShowLeaveModal(true);
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    window.addEventListener("popstate", handlePopState);
+    document.addEventListener("click", handleDocumentClick, true);
+
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+      window.removeEventListener("popstate", handlePopState);
+      document.removeEventListener("click", handleDocumentClick, true);
+      window.history.pushState = originalPushState;
+      window.history.replaceState = originalReplaceState;
+    };
+  }, [hasUnsavedChanges]);
+
   const handleAddSkill = () => {
     if (!newSkillId) return;
+    if (getVisibleSkillsCount() >= MAX_SKILLS_PER_SECTION) {
+      setMessage({
+        type: "error",
+        text: `No se puede realizar esa adición. Máximo ${MAX_SKILLS_PER_SECTION} habilidades para enseñar.`,
+      });
+      return;
+    }
     setPendingSkillAdds([
       ...pendingSkillAdds,
       { skill_id: newSkillId, level: newSkillLevel },
@@ -119,11 +274,9 @@ export function EditProfileForm({
 
   const handleRemoveSkill = (skillId: string, isPending: boolean) => {
     if (isPending) {
-      setPendingSkillAdds(
-        pendingSkillAdds.filter(
-          (_, i) =>
-            pendingSkillAdds.indexOf({ skill_id: skillId, level: "" }) !== i,
-        ),
+      const pendingIndex = Number(skillId.replace("new-", ""));
+      setPendingSkillAdds((prev) =>
+        prev.filter((_, idx) => idx !== pendingIndex),
       );
     } else {
       setSkillsToDelete([...skillsToDelete, skillId]);
@@ -132,6 +285,13 @@ export function EditProfileForm({
 
   const handleAddInterest = () => {
     if (!newInterestId) return;
+    if (getVisibleInterestsCount() >= MAX_SKILLS_PER_SECTION) {
+      setMessage({
+        type: "error",
+        text: `No se puede realizar esa adición. Máximo ${MAX_SKILLS_PER_SECTION} habilidades para aprender.`,
+      });
+      return;
+    }
     setPendingInterestAdds([
       ...pendingInterestAdds,
       { skill_id: newInterestId },
@@ -141,10 +301,9 @@ export function EditProfileForm({
 
   const handleRemoveInterest = (interestId: string, isPending: boolean) => {
     if (isPending) {
-      setPendingInterestAdds(
-        pendingInterestAdds.filter(
-          (_, i) => pendingInterestAdds.indexOf({ skill_id: interestId }) !== i,
-        ),
+      const pendingIndex = Number(interestId.replace("new-interest-", ""));
+      setPendingInterestAdds((prev) =>
+        prev.filter((_, idx) => idx !== pendingIndex),
       );
     } else {
       setInterestsToDelete([...interestsToDelete, interestId]);
@@ -153,6 +312,19 @@ export function EditProfileForm({
 
   const handleAddAvailability = () => {
     if (!newSlot) return;
+
+    const alreadyExists = getVisibleAvailability().some(
+      (a) => a.day === newDay && a.slot_id === newSlot,
+    );
+
+    if (alreadyExists) {
+      setMessage({
+        type: "error",
+        text: "Ese horario ya está agregado para ese día.",
+      });
+      return;
+    }
+
     setPendingAvailabilityAdds([
       ...pendingAvailabilityAdds,
       { day: newDay, slot_id: newSlot },
@@ -161,21 +333,72 @@ export function EditProfileForm({
 
   const handleRemoveAvailability = (avId: string, isPending: boolean) => {
     if (isPending) {
-      setPendingAvailabilityAdds(
-        pendingAvailabilityAdds.filter(
-          (_, i) =>
-            pendingAvailabilityAdds.indexOf({ day: "", slot_id: avId }) !== i,
-        ),
+      const pendingIndex = Number(avId.replace("new-avail-", ""));
+      setPendingAvailabilityAdds((prev) =>
+        prev.filter((_, idx) => idx !== pendingIndex),
       );
     } else {
       setAvailabilityToDelete([...availabilityToDelete, avId]);
     }
   };
 
+  const resetPendingChanges = () => {
+    setPendingSkillAdds([]);
+    setPendingInterestAdds([]);
+    setPendingAvailabilityAdds([]);
+    setSkillsToDelete([]);
+    setInterestsToDelete([]);
+    setAvailabilityToDelete([]);
+    setNewSkillId("");
+    setNewSkillLevel("Básico");
+    setNewInterestId("");
+    setNewDay("Lunes");
+    setNewSlot(timeSlots[0]?.id || "");
+    setEditGPA(userGPA?.toString() || "");
+    setEditCareer(userCareer || "");
+    setMessage(null);
+  };
+
+  const handleConfirmLeave = () => {
+    isConfirmingLeaveRef.current = true;
+    setShowLeaveModal(false);
+    resetPendingChanges();
+
+    if (pendingNavigationHref === "__back__") {
+      window.history.back();
+      return;
+    }
+
+    if (pendingNavigationHref) {
+      window.location.href = pendingNavigationHref;
+    }
+  };
+
+  const handleStayOnPage = () => {
+    setPendingNavigationHref(null);
+    setShowLeaveModal(false);
+  };
+
   const handleSave = async () => {
     try {
       setIsSaving(true);
       setMessage(null);
+
+      if (getVisibleSkillsCount() > MAX_SKILLS_PER_SECTION) {
+        setMessage({
+          type: "error",
+          text: `Solo puedes tener máximo ${MAX_SKILLS_PER_SECTION} habilidades para enseñar.`,
+        });
+        return;
+      }
+
+      if (getVisibleInterestsCount() > MAX_SKILLS_PER_SECTION) {
+        setMessage({
+          type: "error",
+          text: `Solo puedes tener máximo ${MAX_SKILLS_PER_SECTION} habilidades para aprender.`,
+        });
+        return;
+      }
 
       // Ejecutar todas las operaciones
 
@@ -305,20 +528,7 @@ export function EditProfileForm({
 
   const handleCancel = () => {
     // Revertir cambios pendientes
-    setPendingSkillAdds([]);
-    setPendingInterestAdds([]);
-    setPendingAvailabilityAdds([]);
-    setSkillsToDelete([]);
-    setInterestsToDelete([]);
-    setAvailabilityToDelete([]);
-    setNewSkillId("");
-    setNewSkillLevel("Básico");
-    setNewInterestId("");
-    setNewDay("Lunes");
-    setNewSlot(timeSlots[0]?.id || "");
-    setEditGPA(userGPA?.toString() || "");
-    setEditCareer(userCareer || "");
-    setMessage(null);
+    resetPendingChanges();
   };
 
   const getVisibleSkills = () => [
@@ -338,17 +548,36 @@ export function EditProfileForm({
     })),
   ];
 
-  const getVisibleAvailability = () => [
-    ...availability.filter((a) => !availabilityToDelete.includes(a.id)),
-    ...pendingAvailabilityAdds.map((a, idx) => ({
-      id: `new-avail-${idx}`,
-      day: a.day,
-      slot_id: a.slot_id,
-    })),
-  ];
-
   return (
     <div className="space-y-8">
+      {showLeaveModal && (
+        <div className="fixed inset-0 z-[100] bg-black/40 flex items-center justify-center p-4">
+          <div className="w-full max-w-md rounded-2xl bg-white shadow-2xl border border-[#cfe8fb] p-6">
+            <h4 className="text-lg font-bold text-[#114c5f] mb-2">
+              Tienes cambios sin guardar
+            </h4>
+            <p className="text-sm text-[#325e80] mb-5">
+              Si sales ahora, perderás los cambios no guardados. ¿Quieres salir
+              de todas formas?
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={handleStayOnPage}
+                className="px-4 py-2 rounded-lg border border-[#0057cc] text-[#0057cc] font-semibold hover:bg-[#f0f7ff]"
+              >
+                Quedarme
+              </button>
+              <button
+                onClick={handleConfirmLeave}
+                className="px-4 py-2 rounded-lg bg-red-600 text-white font-semibold hover:bg-red-700"
+              >
+                Salir sin guardar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Notificación Flotante */}
       {message && (
         <NotificationCard
@@ -482,12 +711,22 @@ export function EditProfileForm({
 
               <button
                 onClick={handleAddSkill}
-                disabled={!newSkillId || isSaving}
+                disabled={
+                  !newSkillId ||
+                  isSaving ||
+                  getVisibleSkillsCount() >= MAX_SKILLS_PER_SECTION
+                }
                 className="flex items-center gap-2 bg-[#0057cc] hover:bg-[#004499] disabled:bg-gray-400 text-white px-4 py-2 rounded-lg font-semibold transition-colors text-sm"
               >
                 <Plus size={16} /> Añadir
               </button>
             </div>
+
+            {getVisibleSkillsCount() >= MAX_SKILLS_PER_SECTION && (
+              <p className="mt-3 text-sm font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                Haz alcanzado el número máximo de habilidades por enseñar
+              </p>
+            )}
           </div>
 
           {/* Habilidades a aprender */}
@@ -586,7 +825,11 @@ export function EditProfileForm({
 
                   <button
                     onClick={handleAddInterest}
-                    disabled={!newInterestId || isSaving}
+                    disabled={
+                      !newInterestId ||
+                      isSaving ||
+                      getVisibleInterestsCount() >= MAX_SKILLS_PER_SECTION
+                    }
                     className="flex items-center gap-2 bg-[#0057cc] hover:bg-[#004499] disabled:bg-gray-400 text-white px-4 py-2 rounded-lg font-semibold transition-colors text-sm h-fit ml-3"
                   >
                     <Plus size={16} /> Añadir
@@ -594,6 +837,12 @@ export function EditProfileForm({
                 </div>
               </div>
             </div>
+
+            {getVisibleInterestsCount() >= MAX_SKILLS_PER_SECTION && (
+              <p className="mt-3 text-sm font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                Haz alcanzado el número máximo de habilidades por aprender
+              </p>
+            )}
           </div>
         </div>
 
@@ -631,7 +880,13 @@ export function EditProfileForm({
                 className="w-full px-3 py-2 border border-[#cfe8fb] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0057cc] text-sm bg-[#eff6ff] text-[#114c5f]"
               >
                 {timeSlots.map((slot) => (
-                  <option key={slot.id} value={slot.id}>
+                  <option
+                    key={slot.id}
+                    value={slot.id}
+                    disabled={getVisibleAvailability().some(
+                      (a) => a.day === newDay && a.slot_id === slot.id,
+                    )}
+                  >
                     {slot.range}
                   </option>
                 ))}
@@ -640,11 +895,25 @@ export function EditProfileForm({
 
             <button
               onClick={handleAddAvailability}
-              disabled={!newSlot || isSaving}
+              disabled={
+                !newSlot ||
+                isSaving ||
+                getVisibleAvailability().some(
+                  (a) => a.day === newDay && a.slot_id === newSlot,
+                )
+              }
               className="w-full flex items-center justify-center gap-2 bg-[#0057cc] hover:bg-[#004499] disabled:bg-gray-400 text-white px-4 py-2 rounded-lg font-semibold transition-colors text-sm"
             >
               <Plus size={16} /> Añadir Horario
             </button>
+
+            {getVisibleAvailability().some(
+              (a) => a.day === newDay && a.slot_id === newSlot,
+            ) && (
+              <p className="text-sm font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                Ese horario ya fue agregado para el día seleccionado.
+              </p>
+            )}
           </div>
 
           {getVisibleAvailability().length > 0 && (
@@ -742,17 +1011,7 @@ export function EditProfileForm({
         </button>
         <button
           onClick={handleSave}
-          disabled={
-            isSaving ||
-            (pendingSkillAdds.length === 0 &&
-              pendingInterestAdds.length === 0 &&
-              pendingAvailabilityAdds.length === 0 &&
-              skillsToDelete.length === 0 &&
-              interestsToDelete.length === 0 &&
-              availabilityToDelete.length === 0 &&
-              editGPA === userGPA?.toString() &&
-              editCareer === userCareer)
-          }
+          disabled={isSaving || !hasUnsavedChanges}
           className="px-8 py-3 bg-[#0057cc] hover:bg-[#004499] disabled:bg-gray-400 text-white rounded-lg font-bold transition-colors"
         >
           {isSaving ? "Guardando..." : "Guardar Cambios"}

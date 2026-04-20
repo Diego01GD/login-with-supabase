@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Image from "next/image";
 import { UserDetailModal } from "./user-detail-modal";
+import { Plus } from "lucide-react";
 
 interface Skill {
   name: string;
@@ -22,6 +23,7 @@ interface UserCardProps {
   skill: string;
   level: string;
   schedule: string;
+  scheduleCount?: number;
   matchScore?: "perfect" | "good" | "fair";
   // Datos adicionales para el modal detallado
   skills?: Skill[];
@@ -44,6 +46,7 @@ export function UserCard({
   skill,
   level,
   schedule,
+  scheduleCount = 1,
   matchScore = "fair",
   skills,
   availability,
@@ -151,7 +154,16 @@ export function UserCard({
             <p className="text-xs font-bold text-[#4a4a4a] uppercase tracking-wider">
               Disponibilidad
             </p>
-            <p className="text-sm text-[#285a77]">{schedule}</p>
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-sm text-[#285a77] bg-gray-200 px-2 py-1 rounded-sm">
+                {schedule}
+              </span>
+              {scheduleCount > 1 && (
+                <span className="inline-flex h-6 min-w-6 items-center justify-center rounded-sm bg-gray-300 px-2 text-xs font-bold text-gray-700">
+                  <Plus className="w-4" />
+                </span>
+              )}
+            </div>
           </div>
 
           {/* Botón */}
@@ -172,6 +184,7 @@ export function UserCard({
         userId={userId}
         currentUserId={currentUserId}
         avatarUrl={avatarUrl}
+        selectedSkill={skill}
         skills={defaultSkills}
         availability={defaultAvailability}
         academicInfo={defaultAcademicInfo}

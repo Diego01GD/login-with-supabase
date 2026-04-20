@@ -7,7 +7,7 @@ import LogoSS from "@/public/images/logo.png";
 import { createClient } from "@/lib/supabase/client"; // Importar cliente de supabase
 import { UserDropdownMenu } from "@/components/user-dropdown-menu";
 import { DiscoveryContent } from "@/components/discovery-content";
-import { MessageSquare, Repeat } from "lucide-react";
+import { MessageCircleHeart, MessageSquare, Repeat } from "lucide-react";
 
 interface Profile {
   id: string;
@@ -30,6 +30,7 @@ interface MatchedUser {
   skill: string;
   level: string;
   schedule: string;
+  scheduleCount: number;
   matchScore: "perfect" | "good" | "fair";
   shift: string;
   availability: Array<{ day: string; timeSlots: string[] }>;
@@ -39,6 +40,11 @@ interface Skill {
   id: string;
   name: string;
   category: string;
+}
+
+interface TrendingSkill {
+  skill: string;
+  count: number;
 }
 
 interface ProtectedPageClientProps {
@@ -52,6 +58,7 @@ interface ProtectedPageClientProps {
   allCategories: string[];
   allShifts: string[];
   skillMap: Record<string, Skill>;
+  trendingSkills: TrendingSkill[];
 }
 
 export function ProtectedPageClient({
@@ -65,6 +72,7 @@ export function ProtectedPageClient({
   allCategories,
   allShifts,
   skillMap,
+  trendingSkills,
 }: ProtectedPageClientProps) {
   const supabase = createClient();
   const [activeCount, setActiveCount] = useState(initialActiveCount);
@@ -74,17 +82,17 @@ export function ProtectedPageClient({
   // SUSCRIPCIÓN EN TIEMPO REAL PARA MENSAJES
   useEffect(() => {
     const channel = supabase
-      .channel('dashboard-messages')
+      .channel("dashboard-messages")
       .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'messages' },
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "messages" },
         (payload) => {
           const msg = payload.new;
           // Si el mensaje no lo envié yo, incremento el contador del dashboard
           if (msg.sender_id !== userId) {
-            setUnreadCount(prev => prev + 1);
+            setUnreadCount((prev) => prev + 1);
           }
-        }
+        },
       )
       .subscribe();
 
@@ -99,12 +107,16 @@ export function ProtectedPageClient({
       try {
         const activeRes = await fetch(`/api/skill-exchanges?type=active`);
         const activeJson = await activeRes.json();
-        const count = (activeJson.data || []).filter((e: any) => e.status === "accepted").length;
+        const count = (activeJson.data || []).filter(
+          (e: any) => e.status === "accepted",
+        ).length;
         setActiveCount(count);
 
         const recRes = await fetch(`/api/skill-exchanges?type=received`);
         const recJson = await recRes.json();
-        const pCount = (recJson.data || []).filter((e: any) => e.status === "pending").length;
+        const pCount = (recJson.data || []).filter(
+          (e: any) => e.status === "pending",
+        ).length;
         setPendingCount(pCount);
       } catch (error) {
         console.error("Error actualizando contadores:", error);
@@ -121,34 +133,63 @@ export function ProtectedPageClient({
       <div className="w-full">
         <nav className="flex items-center justify-between px-12 py-4 bg-white/80 backdrop-blur-sm sticky top-0 z-50 border-b border-[#9cd2d3]/20">
           <div className="flex items-center gap-2">
-            <Link href="/" className="flex items-center hover:opacity-90 transition-opacity">
-              <Image src={LogoSS} alt="SkillSwap" className="rounded-full shadow-sm w-32 mr-3" />
-              <span className="text-xl font-bold tracking-tight text-[#114c5f]">SkillSwap</span>
+            <Link
+              href="/"
+              className="flex items-center hover:opacity-90 transition-opacity"
+            >
+              <Image
+                src={LogoSS}
+                alt="SkillSwap"
+                className="rounded-full shadow-sm w-32 mr-3"
+              />
+              <span className="text-xl font-bold tracking-tight text-[#114c5f]">
+                SkillSwap
+              </span>
             </Link>
           </div>
 
           <div className="md:text-xl text-[#114c5f] font-bold flex items-center gap-10">
             <div className="flex gap-8">
-              <Link href="/protected/swap" title="Gestión de Intercambios" className="relative">
-                <Repeat className="hover:scale-110 transition-transform cursor-pointer hover:text-[#0057cc]" size={26} />
+              <Link
+                href="/protected/swap"
+                title="Gestión de Intercambios"
+                className="relative"
+              >
+                <Repeat
+                  className="hover:scale-110 transition-transform cursor-pointer hover:text-[#0057cc]"
+                  size={26}
+                />
                 {pendingCount > 0 && (
                   <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">
                     {pendingCount > 99 ? "99+" : pendingCount}
                   </span>
                 )}
               </Link>
-              
+
               {/* INDICADOR DE MENSAJES NO LEÍDOS */}
               <Link href="/protected/messages" className="relative">
-                <MessageSquare className="hover:scale-110 transition-transform cursor-pointer hover:text-[#0057cc]" size={26} />
+                <MessageSquare
+                  className="hover:scale-110 transition-transform cursor-pointer hover:text-[#0057cc]"
+                  size={26}
+                />
                 {unreadCount > 0 && (
                   <span className="absolute -top-2 -right-2 bg-red-500 text-white text-[10px] font-bold rounded-full h-5 w-5 flex items-center justify-center animate-pulse">
                     {unreadCount > 99 ? "99+" : unreadCount}
                   </span>
                 )}
               </Link>
+
+              <Link href="/protected/feedback" title="Mi Reputación">
+                <MessageCircleHeart
+                  className="hover:scale-110 transition-transform cursor-pointer hover:text-[#0057cc]"
+                  size={26}
+                />
+              </Link>
             </div>
-            <UserDropdownMenu avatarUrl={profile.avatar_url} firstName={firstName} />
+            <UserDropdownMenu
+              avatarUrl={profile.avatar_url}
+              firstName={firstName}
+            />
           </div>
         </nav>
       </div>
@@ -164,6 +205,7 @@ export function ProtectedPageClient({
           skillMap={skillMap}
           activeExchangesCount={activeCount}
           pendingReceivedCount={pendingCount}
+          trendingSkills={trendingSkills}
         />
       </div>
     </main>

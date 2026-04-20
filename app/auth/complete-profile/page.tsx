@@ -32,6 +32,8 @@ interface UserAvailability {
   comment: string;
 }
 
+const MAX_SKILLS_PER_SECTION = 5;
+
 export default function CompleteProfile() {
   const router = useRouter();
   const supabase = createClient();
@@ -115,6 +117,10 @@ export default function CompleteProfile() {
       return "Añade al menos una habilidad que poseas.";
     if (myInterests.length === 0)
       return "Añade al menos una habilidad que quieras aprender.";
+    if (mySkills.length > MAX_SKILLS_PER_SECTION)
+      return `Solo puedes registrar máximo ${MAX_SKILLS_PER_SECTION} habilidades para enseñar.`;
+    if (myInterests.length > MAX_SKILLS_PER_SECTION)
+      return `Solo puedes registrar máximo ${MAX_SKILLS_PER_SECTION} habilidades para aprender.`;
     if (myAvailability.length === 0) return "Define tu disponibilidad horaria.";
     if (isNaN(gpaNum) || gpaNum < 0 || gpaNum > 100)
       return "El promedio debe estar entre 0.0 y 100.0.";
@@ -289,6 +295,13 @@ export default function CompleteProfile() {
             onRemove={(id: string) =>
               setMySkills(mySkills.filter((s) => s.skill_id !== id))
             }
+            maxItems={MAX_SKILLS_PER_SECTION}
+            limitSectionLabel="enseñar"
+            onLimitExceeded={() =>
+              setFormError(
+                `No se puede realizar esa adición. Máximo ${MAX_SKILLS_PER_SECTION} habilidades para enseñar.`,
+              )
+            }
             withLevel
           />
 
@@ -301,6 +314,13 @@ export default function CompleteProfile() {
             onAdd={(i: UserInterest) => setMyInterests([...myInterests, i])}
             onRemove={(id: string) =>
               setMyInterests(myInterests.filter((i) => i.skill_id !== id))
+            }
+            maxItems={MAX_SKILLS_PER_SECTION}
+            limitSectionLabel="aprender"
+            onLimitExceeded={() =>
+              setFormError(
+                `No se puede realizar esa adición. Máximo ${MAX_SKILLS_PER_SECTION} habilidades para aprender.`,
+              )
             }
           />
 
@@ -458,6 +478,9 @@ interface SkillSelectorProps<T extends SkillSelectorItem = SkillSelectorItem> {
   selectedList: T[];
   onAdd: (item: T) => void;
   onRemove: (id: string) => void;
+  maxItems?: number;
+  limitSectionLabel?: string;
+  onLimitExceeded?: () => void;
   withLevel?: boolean;
 }
 
@@ -469,6 +492,9 @@ function SkillSelector<T extends SkillSelectorItem>({
   selectedList,
   onAdd,
   onRemove,
+  maxItems,
+  limitSectionLabel,
+  onLimitExceeded,
   withLevel = false,
 }: SkillSelectorProps<T>) {
   const [cat, setCat] = useState("");
@@ -481,6 +507,10 @@ function SkillSelector<T extends SkillSelectorItem>({
     if (!skillId) return;
     // Evitar duplicados
     if (selectedList.some((s) => s.skill_id === skillId)) return;
+    if (typeof maxItems === "number" && selectedList.length >= maxItems) {
+      onLimitExceeded?.();
+      return;
+    }
 
     if (withLevel) {
       onAdd({ skill_id: skillId, level } as T);
@@ -548,6 +578,12 @@ function SkillSelector<T extends SkillSelectorItem>({
           </Button>
         </div>
       </div>
+      {typeof maxItems === "number" && selectedList.length >= maxItems && (
+        <p className="text-sm font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-4">
+          Haz alcanzado el número máximo de habilidades por{" "}
+          {limitSectionLabel || "apartado"}
+        </p>
+      )}
       <div className="flex flex-wrap gap-3">
         {selectedList.map((item) => {
           const skillName = allSkills.find((s) => s.id === item.skill_id)?.name;

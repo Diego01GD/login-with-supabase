@@ -59,7 +59,12 @@ export function SearchFiltersWrapper({
 
   const handleSearch = (
     query: string,
-    filters: { category?: string; shift?: string },
+    filters: {
+      category?: string;
+      shift?: string;
+      level?: string;
+      skillName?: string;
+    },
   ) => {
     setSearchQuery(query);
     setSelectedCategory(filters.category);
@@ -67,6 +72,7 @@ export function SearchFiltersWrapper({
   };
 
   const categories = Array.from(new Set(allSkills.map((s) => s.category)));
+  const skillNames = Array.from(new Set(allSkills.map((s) => s.name)));
 
   return (
     <div className="space-y-8">
@@ -75,6 +81,7 @@ export function SearchFiltersWrapper({
         onSearch={handleSearch}
         categories={categories}
         shifts={allShifts}
+        skillNames={skillNames}
       />
 
       {/* Resultados */}

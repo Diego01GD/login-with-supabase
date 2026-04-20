@@ -1,4 +1,9 @@
 import { createClient } from "@/lib/supabase/server";
+import {
+  notifyExchangeCompleted,
+  notifyExchangeDecision,
+  notifyExchangeRequested,
+} from "@/lib/email/notifications";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(request: NextRequest) {
@@ -12,7 +17,7 @@ export async function POST(request: NextRequest) {
     }
 
     const senderId = sessionData.user.id;
-    const { receiverId } = await request.json();
+    const { receiverId, skillName } = await request.json();
 
     if (!receiverId) {
       return NextResponse.json(
@@ -66,6 +71,7 @@ export async function POST(request: NextRequest) {
         sender_id: senderId,
         receiver_id: receiverId,
         status: "pending",
+        skill_name: skillName,
       })
       .select()
       .single();
@@ -73,6 +79,12 @@ export async function POST(request: NextRequest) {
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
+
+    await notifyExchangeRequested({
+      senderId,
+      receiverId,
+      skillName,
+    });
 
     return NextResponse.json({ success: true, data }, { status: 201 });
   } catch (error) {
@@ -99,7 +111,7 @@ export async function GET(request: NextRequest) {
     const type = searchParams.get("type");
 
     let query = supabase.from("skill_exchanges").select(`
-        id, sender_id, receiver_id, status, created_at,
+      id, sender_id, receiver_id, status, created_at, skill_name,
         sender_profile:profiles!skill_exchanges_sender_id_fkey(id, full_name, avatar_url, career, gpa),
         receiver_profile:profiles!skill_exchanges_receiver_id_fkey(id, full_name, avatar_url, career, gpa)
     `);
@@ -191,6 +203,36 @@ export async function PATCH(request: NextRequest) {
       .eq("id", exchangeId)
       .select()
       .single();
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 400 });
+    }
+
+    if (newStatus === "accepted") {
+      await notifyExchangeDecision({
+        senderId: exchange.sender_id,
+        receiverId: exchange.receiver_id,
+        status: "accepted",
+        skillName: exchange.skill_name,
+      });
+    }
+
+    // Solo notificar rechazo si es el receiver rechazando (no el sender cancelando)
+    if (newStatus === "rejected" && isReceiver) {
+      await notifyExchangeDecision({
+        senderId: exchange.sender_id,
+        receiverId: exchange.receiver_id,
+        status: "rejected",
+        skillName: exchange.skill_name,
+      });
+    }
+
+    if (newStatus === "completed") {
+      await notifyExchangeCompleted({
+        senderId: exchange.sender_id,
+        receiverId: exchange.receiver_id,
+      });
+    }
 
     return NextResponse.json({ success: true, data });
   } catch (error) {

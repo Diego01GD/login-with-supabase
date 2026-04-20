@@ -7,6 +7,9 @@ import {
   MessageSquare,
   RefreshCw,
   History as HistoryIcon,
+  Star,
+  HandHeart,
+  ShieldCheck,
 } from "lucide-react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
@@ -24,6 +27,14 @@ export function SwapTabsContent({
   onActiveExchangesChange,
   onPendingReceivedChange,
 }: SwapTabsContentProps) {
+  type RatingKey =
+    | "generalRating"
+    | "masteryRating"
+    | "clarityRating"
+    | "punctualityRating"
+    | "attitudeRating"
+    | "respectRating";
+
   const [activeTab, setActiveTab] = useState<
     "received" | "sent" | "active" | "history"
   >("received");
@@ -31,6 +42,10 @@ export function SwapTabsContent({
   const [isLoading, setIsLoading] = useState(true);
   const [activeCount, setActiveCount] = useState(0);
   const [pendingReceivedCount, setPendingReceivedCount] = useState(0);
+  const [statusUpdating, setStatusUpdating] = useState<{
+    exchangeId: string;
+    newStatus: string;
+  } | null>(null);
   const [message, setMessage] = useState<{
     type: "success" | "error";
     text: string;
@@ -46,6 +61,70 @@ export function SwapTabsContent({
     skills: [],
     availability: [],
   });
+
+  const [reviewedExchangeIds, setReviewedExchangeIds] = useState<string[]>([]);
+  const [reviewPrompt, setReviewPrompt] = useState<{
+    isOpen: boolean;
+    exchange: any | null;
+  }>({
+    isOpen: false,
+    exchange: null,
+  });
+  const [reviewForm, setReviewForm] = useState<{
+    isOpen: boolean;
+    exchange: any | null;
+    generalRating: number;
+    masteryRating: number;
+    clarityRating: number;
+    punctualityRating: number;
+    attitudeRating: number;
+    respectRating: number;
+    comment: string;
+    isSubmitting: boolean;
+  }>({
+    isOpen: false,
+    exchange: null,
+    generalRating: 0,
+    masteryRating: 0,
+    clarityRating: 0,
+    punctualityRating: 0,
+    attitudeRating: 0,
+    respectRating: 0,
+    comment: "",
+    isSubmitting: false,
+  });
+
+  const resetReviewForm = (exchange: any | null = null) => {
+    setReviewForm({
+      isOpen: !!exchange,
+      exchange,
+      generalRating: 0,
+      masteryRating: 0,
+      clarityRating: 0,
+      punctualityRating: 0,
+      attitudeRating: 0,
+      respectRating: 0,
+      comment: "",
+      isSubmitting: false,
+    });
+  };
+
+  const openReviewForm = (exchange: any) => {
+    setReviewPrompt({ isOpen: false, exchange: null });
+    resetReviewForm(exchange);
+  };
+
+  const handleSetRating = (key: RatingKey, value: number) => {
+    setReviewForm((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const allRatingsComplete =
+    reviewForm.generalRating > 0 &&
+    reviewForm.masteryRating > 0 &&
+    reviewForm.clarityRating > 0 &&
+    reviewForm.punctualityRating > 0 &&
+    reviewForm.attitudeRating > 0 &&
+    reviewForm.respectRating > 0;
 
   const loadData = useCallback(async () => {
     setIsLoading(true);
@@ -77,6 +156,13 @@ export function SwapTabsContent({
 
       setExchanges(filtered);
 
+      const reviewsRes = await fetch("/api/exchange-reviews");
+      const reviewsJson = await reviewsRes.json();
+      const reviewedIds = (reviewsJson.data || []).map(
+        (review: any) => review.exchange_id,
+      );
+      setReviewedExchangeIds(reviewedIds);
+
       // 2. Actualizar contador de activos (status = 'accepted')
       const resActive = await fetch(`/api/skill-exchanges?type=active`);
       const jsonActive = await resActive.json();
@@ -106,12 +192,13 @@ export function SwapTabsContent({
     loadData();
   }, [loadData]);
 
-  const handleUpdateStatus = async (exchangeId: string, newStatus: string) => {
+  const handleUpdateStatus = async (exchange: any, newStatus: string) => {
+    setStatusUpdating({ exchangeId: exchange.id, newStatus });
     try {
       const response = await fetch("/api/skill-exchanges", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ exchangeId, newStatus }),
+        body: JSON.stringify({ exchangeId: exchange.id, newStatus }),
       });
 
       const data = await response.json();
@@ -136,10 +223,23 @@ export function SwapTabsContent({
         text: successMessage,
       });
 
+      if (
+        newStatus === "completed" &&
+        exchange.sender_id === userId &&
+        !reviewedExchangeIds.includes(exchange.id)
+      ) {
+        setReviewPrompt({
+          isOpen: true,
+          exchange,
+        });
+      }
+
       // Recargar datos para que desaparezca de la pestaña actual y se mueva si es necesario
       loadData();
     } catch (error) {
       setMessage({ type: "error", text: "Error de conexión" });
+    } finally {
+      setStatusUpdating(null);
     }
   };
 
@@ -189,6 +289,101 @@ export function SwapTabsContent({
     });
   };
 
+  const handleSubmitReview = async () => {
+    if (!reviewForm.exchange || !allRatingsComplete) {
+      setMessage({
+        type: "error",
+        text: "Completa todas las calificaciones antes de enviar.",
+      });
+      return;
+    }
+
+    try {
+      setReviewForm((prev) => ({ ...prev, isSubmitting: true }));
+
+      const response = await fetch("/api/exchange-reviews", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          exchangeId: reviewForm.exchange.id,
+          generalRating: reviewForm.generalRating,
+          masteryRating: reviewForm.masteryRating,
+          clarityRating: reviewForm.clarityRating,
+          punctualityRating: reviewForm.punctualityRating,
+          attitudeRating: reviewForm.attitudeRating,
+          respectRating: reviewForm.respectRating,
+          comment: reviewForm.comment,
+          skillName: reviewForm.exchange.skill_name,
+        }),
+      });
+
+      const payload = await response.json();
+      if (!response.ok) {
+        setMessage({
+          type: "error",
+          text: payload.error || "No se pudo guardar la reseña",
+        });
+        return;
+      }
+
+      setReviewedExchangeIds((prev) => [...prev, reviewForm.exchange.id]);
+      setMessage({
+        type: "success",
+        text: "¡Calificación enviada correctamente!",
+      });
+      resetReviewForm(null);
+      setReviewPrompt({ isOpen: false, exchange: null });
+      loadData();
+    } catch {
+      setMessage({
+        type: "error",
+        text: "No se pudo guardar la reseña. Intenta de nuevo.",
+      });
+    } finally {
+      setReviewForm((prev) => ({ ...prev, isSubmitting: false }));
+    }
+  };
+
+  const StarRatingInput = ({
+    label,
+    value,
+    ratingKey,
+    mirrorKey,
+  }: {
+    label: string;
+    value: number;
+    ratingKey: RatingKey;
+    mirrorKey?: RatingKey;
+  }) => (
+    <div className="bg-[#e8edf7] rounded-2xl p-4">
+      <p className="text-center font-black text-[#1a1a1a] text-xl md:text-2xl mb-3">
+        {label}
+      </p>
+      <div className="flex justify-center gap-1 md:gap-2">
+        {[1, 2, 3, 4, 5].map((star) => (
+          <button
+            key={star}
+            type="button"
+            onClick={() => {
+              handleSetRating(ratingKey, star);
+              if (mirrorKey) handleSetRating(mirrorKey, star);
+            }}
+            className="hover:scale-110 transition-transform"
+          >
+            <Star
+              size={34}
+              className={
+                star <= value
+                  ? "fill-[#f4c542] text-[#f4c542]"
+                  : "text-[#f4c542]"
+              }
+            />
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+
   const ExchangeCard = ({ exchange }: { exchange: any }) => {
     const profile = exchange.profiles;
     if (!profile) return null;
@@ -196,6 +391,15 @@ export function SwapTabsContent({
     const isHistory = activeTab === "history";
     const isActive = activeTab === "active";
     const isSender = exchange.sender_id === userId;
+    const canReview = isHistory && isSender && exchange.status === "completed";
+    const alreadyReviewed = reviewedExchangeIds.includes(exchange.id);
+    const isRowUpdating = statusUpdating?.exchangeId === exchange.id;
+    const isAcceptedLoading =
+      isRowUpdating && statusUpdating?.newStatus === "accepted";
+    const isRejectedLoading =
+      isRowUpdating && statusUpdating?.newStatus === "rejected";
+    const isCompletedLoading =
+      isRowUpdating && statusUpdating?.newStatus === "completed";
 
     return (
       <div className="bg-white rounded-2xl p-6 flex items-center justify-between shadow-sm border border-gray-100 mb-4 transition-all hover:shadow-md">
@@ -227,9 +431,13 @@ export function SwapTabsContent({
                 className={`text-xs font-bold px-2 py-0.5 rounded-full ${
                   exchange.status === "accepted"
                     ? "bg-green-100 text-green-700"
-                    : exchange.status === "pending"
-                      ? "bg-yellow-100 text-yellow-700"
-                      : "bg-gray-100 text-gray-600"
+                    : exchange.status === "completed"
+                      ? "bg-blue-100 text-blue-700"
+                      : exchange.status === "pending"
+                        ? "bg-yellow-100 text-yellow-700"
+                        : exchange.status === "rejected"
+                          ? "bg-red-100 text-red-700"
+                          : "bg-gray-100 text-gray-600"
                 }`}
               >
                 {exchange.status.toUpperCase()}
@@ -245,16 +453,32 @@ export function SwapTabsContent({
           {activeTab === "received" && exchange.status === "pending" && (
             <>
               <button
-                onClick={() => handleUpdateStatus(exchange.id, "accepted")}
+                onClick={() => handleUpdateStatus(exchange, "accepted")}
+                disabled={isRowUpdating}
                 className="bg-[#0057cc] text-white px-6 py-2 rounded-lg font-bold hover:bg-blue-700 transition-colors"
               >
-                Aceptar
+                {isAcceptedLoading ? (
+                  <span className="inline-flex items-center gap-2">
+                    <RefreshCw size={16} className="animate-spin" />
+                    Aceptando...
+                  </span>
+                ) : (
+                  "Aceptar"
+                )}
               </button>
               <button
-                onClick={() => handleUpdateStatus(exchange.id, "rejected")}
+                onClick={() => handleUpdateStatus(exchange, "rejected")}
+                disabled={isRowUpdating}
                 className="bg-[#eef6ff] text-[#0057cc] px-6 py-2 rounded-lg font-bold hover:bg-blue-50 transition-colors"
               >
-                Ignorar
+                {isRejectedLoading ? (
+                  <span className="inline-flex items-center gap-2">
+                    <RefreshCw size={16} className="animate-spin" />
+                    Ignorando...
+                  </span>
+                ) : (
+                  "Ignorar"
+                )}
               </button>
             </>
           )}
@@ -268,12 +492,34 @@ export function SwapTabsContent({
                 <Eye size={16} /> Detalles
               </button>
 
+              {canReview && (
+                <button
+                  onClick={() => !alreadyReviewed && openReviewForm(exchange)}
+                  disabled={alreadyReviewed}
+                  className={`px-6 py-2 rounded-lg font-bold transition-colors ${
+                    alreadyReviewed
+                      ? "bg-gray-100 text-gray-500 cursor-not-allowed"
+                      : "bg-[#0057cc] text-white hover:bg-blue-700"
+                  }`}
+                >
+                  {alreadyReviewed ? "Reseña realizada" : "Hacer reseña"}
+                </button>
+              )}
+
               {exchange.status === "pending" && activeTab === "sent" && (
                 <button
-                  onClick={() => handleUpdateStatus(exchange.id, "rejected")}
+                  onClick={() => handleUpdateStatus(exchange, "rejected")}
+                  disabled={isRowUpdating}
                   className="bg-red-50 text-red-600 px-6 py-2 rounded-lg font-bold hover:bg-red-100 transition-colors"
                 >
-                  Cancelar
+                  {isRejectedLoading ? (
+                    <span className="inline-flex items-center gap-2">
+                      <RefreshCw size={16} className="animate-spin" />
+                      Cancelando...
+                    </span>
+                  ) : (
+                    "Cancelar"
+                  )}
                 </button>
               )}
 
@@ -304,10 +550,18 @@ export function SwapTabsContent({
               </Link>
               {isSender && (
                 <button
-                  onClick={() => handleUpdateStatus(exchange.id, "completed")}
+                  onClick={() => handleUpdateStatus(exchange, "completed")}
+                  disabled={isRowUpdating}
                   className="bg-[#0057cc] text-white px-6 py-2 rounded-lg font-bold hover:bg-blue-700 transition-colors"
                 >
-                  Completar
+                  {isCompletedLoading ? (
+                    <span className="inline-flex items-center gap-2">
+                      <RefreshCw size={16} className="animate-spin" />
+                      Completando...
+                    </span>
+                  ) : (
+                    "Completar"
+                  )}
                 </button>
               )}
             </>
@@ -336,6 +590,7 @@ export function SwapTabsContent({
         userId={selectedUserModal.userId}
         currentUserId={userId}
         avatarUrl={selectedUserModal.userAvatar}
+        selectedSkill={selectedUserModal.selectedSkill}
         skills={selectedUserModal.skills}
         availability={selectedUserModal.availability}
         academicInfo={{
@@ -343,6 +598,219 @@ export function SwapTabsContent({
           career: selectedUserModal.career,
         }}
       />
+
+      {reviewPrompt.isOpen && reviewPrompt.exchange && (
+        <div className="fixed inset-0 z-[120] bg-black/45 flex items-center justify-center p-4">
+          <div className="w-full max-w-md bg-white rounded-2xl border border-[#dbe6f1] p-6 shadow-2xl">
+            <h3 className="text-2xl font-black text-[#114c5f] mb-2">
+              Intercambio completado
+            </h3>
+            <p className="text-[#2f4050] mb-1 font-semibold">
+              ¿Quieres reseñar este intercambio ahora?
+            </p>
+            <p className="text-sm text-[#4f6070] mb-5">
+              Habilidad: {reviewPrompt.exchange.skill_name || "No especificada"}
+            </p>
+
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => {
+                  setReviewPrompt({ isOpen: false, exchange: null });
+                  setMessage({
+                    type: "success",
+                    text: "Puedes reseñar este intercambio más tarde desde Historial.",
+                  });
+                }}
+                className="px-4 py-2 rounded-lg border border-[#0057cc] text-[#0057cc] font-semibold hover:bg-[#eff6ff]"
+              >
+                Más tarde
+              </button>
+              <button
+                onClick={() => openReviewForm(reviewPrompt.exchange)}
+                className="px-4 py-2 rounded-lg bg-[#0057cc] text-white font-semibold hover:bg-[#004499]"
+              >
+                Sí, reseñar ahora
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {reviewForm.isOpen && reviewForm.exchange && (
+        <div className="fixed inset-0 z-[130] bg-black/50 overflow-y-auto p-4 md:p-6">
+          <div className="min-h-full flex items-center justify-center">
+            <div className="w-full max-w-4xl bg-[#f7f3e7] rounded-3xl border border-[#8f9499] p-4 md:p-6 shadow-2xl">
+              <div className="flex justify-between items-start gap-4 mb-5">
+                <div>
+                  <h2 className="text-3xl md:text-4xl font-black text-[#1a1a1a] leading-tight">
+                    Calificar intercambio
+                  </h2>
+                  <p className="text-sm md:text-base text-[#1f1f1f] font-semibold mt-1">
+                    Tus calificaciones honestas ayudan a mejorar a la comunidad
+                    de SkillSwap
+                  </p>
+                </div>
+                <button
+                  onClick={() => resetReviewForm(null)}
+                  className="text-[#4a5d70] text-5xl font-bold hover:text-[#1f2d3d] leading-none"
+                >
+                  ×
+                </button>
+              </div>
+
+              <div className="rounded-2xl border border-[#8f9499] bg-white p-4 mb-5">
+                <div className="flex flex-col md:flex-row md:items-center gap-4">
+                  <div className="w-20 h-20 rounded-full overflow-hidden bg-[#dce7f4] border border-[#dbe5ef] shadow-sm flex-shrink-0">
+                    {reviewForm.exchange.profiles?.avatar_url ? (
+                      <Image
+                        src={reviewForm.exchange.profiles.avatar_url}
+                        alt={
+                          reviewForm.exchange.profiles.full_name || "Usuario"
+                        }
+                        width={80}
+                        height={80}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-2xl font-bold text-[#134f78]">
+                        {reviewForm.exchange.profiles?.full_name?.charAt(0) ||
+                          "U"}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex-1">
+                    <p className="text-2xl md:text-3xl font-black text-[#1a1a1a] leading-tight">
+                      {reviewForm.exchange.profiles?.full_name || "Usuario"}
+                    </p>
+                    <p className="text-[#0057cc] text-base md:text-lg font-bold mt-1">
+                      {reviewForm.exchange.profiles?.career ||
+                        "Carrera no especificada"}
+                    </p>
+                  </div>
+
+                  <div className="rounded-xl border border-[#dce7f4] bg-[#f8fbff] px-4 py-3 min-w-[220px]">
+                    <p className="text-xs uppercase tracking-wide font-bold text-[#6b7d8f] mb-1">
+                      Habilidad del intercambio
+                    </p>
+                    <p className="text-base md:text-lg font-black text-[#114c5f]">
+                      {reviewForm.exchange.skill_name || "No especificada"}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <section className="rounded-2xl border border-[#8f9499] bg-white p-4 md:p-5 mb-5">
+                <div className="mb-5">
+                  <p className="text-2xl md:text-3xl font-black text-[#1a1a1a] mb-2">
+                    Escala General (1-5 Estrellas)
+                  </p>
+                  <div className="flex flex-wrap gap-1">
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <button
+                        key={star}
+                        type="button"
+                        onClick={() => handleSetRating("generalRating", star)}
+                        className="hover:scale-105 transition-transform"
+                      >
+                        <Star
+                          size={38}
+                          className={
+                            star <= reviewForm.generalRating
+                              ? "fill-[#f4c542] text-[#f4c542]"
+                              : "text-[#f4c542]"
+                          }
+                        />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <StarRatingInput
+                    label="Dominio del Tema"
+                    value={reviewForm.masteryRating}
+                    ratingKey="masteryRating"
+                  />
+                  <StarRatingInput
+                    label="Claridad"
+                    value={reviewForm.clarityRating}
+                    ratingKey="clarityRating"
+                  />
+                  <StarRatingInput
+                    label="Puntualidad"
+                    value={reviewForm.punctualityRating}
+                    ratingKey="punctualityRating"
+                  />
+                  <StarRatingInput
+                    label="Actitud y Respeto"
+                    value={reviewForm.attitudeRating}
+                    ratingKey="attitudeRating"
+                    mirrorKey="respectRating"
+                  />
+                </div>
+              </section>
+
+              <section className="mb-5">
+                <label className="text-xl md:text-2xl font-bold text-[#1a1a1a] block mb-2">
+                  Comentario (Recomendado, no obligatorio)
+                </label>
+                <textarea
+                  value={reviewForm.comment}
+                  onChange={(e) =>
+                    setReviewForm((prev) => ({
+                      ...prev,
+                      comment: e.target.value,
+                    }))
+                  }
+                  placeholder="Comparte tu experiencia..."
+                  className="w-full min-h-[110px] rounded-2xl border border-[#8f9499] px-4 py-3 text-base text-[#1f1f1f] bg-white"
+                />
+              </section>
+
+              <section className="rounded-2xl border border-[#dce7f4] bg-[#f8fbff] p-4 mb-5">
+                <p className="text-base md:text-lg font-black text-[#114c5f] mb-3">
+                  Nuestro compromiso con la comunidad
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5 text-sm md:text-base text-[#23455f]">
+                  <div className="flex items-center gap-3">
+                    <HandHeart className="mt-0.5 text-[#0057cc]" size={32} />
+                    <p>
+                      Tus calificaciones fomentan la confianza entre pares y el
+                      crecimiento mutuo.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <ShieldCheck className="mt-0.5 text-[#0057cc]" size={32} />
+                    <p>
+                      Cada evaluación constructiva fortalece perfiles más
+                      sólidos y transparentes.
+                    </p>
+                  </div>
+                </div>
+              </section>
+
+              <div className="flex flex-wrap justify-end gap-3">
+                <button
+                  onClick={() => resetReviewForm(null)}
+                  className="px-6 py-2.5 rounded-2xl border border-[#7c7c7c] text-[#1a1a1a] text-base md:text-lg font-bold bg-[#e7e7e7] hover:bg-[#dcdcdc]"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleSubmitReview}
+                  disabled={!allRatingsComplete || reviewForm.isSubmitting}
+                  className="px-6 py-2.5 rounded-2xl text-base md:text-lg font-bold bg-[#0057cc] text-white hover:bg-[#004499] disabled:bg-gray-400"
+                >
+                  {reviewForm.isSubmitting
+                    ? "Enviando..."
+                    : "Enviar Calificaciones"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="lg:col-span-8">
         <div className="flex gap-8 mb-8 border-b border-gray-100 overflow-x-auto">

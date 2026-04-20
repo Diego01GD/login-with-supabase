@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { X, Star, Code2, Music, Globe, Briefcase, Award } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
 
 interface UserDetailModalProps {
   isOpen: boolean;
@@ -11,6 +12,7 @@ interface UserDetailModalProps {
   userId?: string;
   currentUserId?: string;
   avatarUrl?: string;
+  selectedSkill?: string;
   skills: Array<{
     name: string;
     level: string;
@@ -67,6 +69,7 @@ export function UserDetailModal({
   userId,
   currentUserId,
   avatarUrl,
+  selectedSkill,
   skills,
   availability,
   academicInfo,
@@ -78,6 +81,8 @@ export function UserDetailModal({
     type: "success" | "error";
     text: string;
   } | null>(null);
+  const [ratingAverage, setRatingAverage] = useState(0);
+  const [ratingReviewsCount, setRatingReviewsCount] = useState(0);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -93,6 +98,33 @@ export function UserDetailModal({
       };
     }
   }, [isOpen, onClose]);
+
+  useEffect(() => {
+    const loadRatingSummary = async () => {
+      if (!isOpen || !userId) return;
+
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from("exchange_reviews")
+        .select("reviewer_id, general_rating")
+        .eq("reviewee_id", userId);
+
+      if (error || !data || data.length === 0) {
+        setRatingAverage(0);
+        setRatingReviewsCount(0);
+        return;
+      }
+
+      const average =
+        data.reduce((sum, item) => sum + (item.general_rating || 0), 0) /
+        data.length;
+
+      setRatingAverage(average);
+      setRatingReviewsCount(data.length);
+    };
+
+    loadRatingSummary();
+  }, [isOpen, userId]);
 
   const handleMakeMatch = async () => {
     if (!userId || !currentUserId) {
@@ -111,6 +143,7 @@ export function UserDetailModal({
         },
         body: JSON.stringify({
           receiverId: userId,
+          skillName: selectedSkill,
         }),
       });
 
@@ -144,13 +177,13 @@ export function UserDetailModal({
   return (
     <div
       ref={overlayRef}
-      className="fixed inset-0 bg-black/50 z-40"
+      className="fixed inset-0 bg-black/50 z-[80]"
       onClick={onClose}
     >
       {/* Modal */}
       <div
         ref={modalRef}
-        className="fixed right-0 top-0 h-screen w-full max-w-lg bg-white shadow-2xl z-50 overflow-y-auto"
+        className="fixed right-0 top-0 h-screen w-full max-w-lg bg-white shadow-2xl z-[90] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header con botón cerrar */}
@@ -199,15 +232,21 @@ export function UserDetailModal({
                 <Star
                   key={i}
                   className={`w-5 h-5 ${
-                    i < 4
+                    i < Math.round(ratingAverage)
                       ? "fill-yellow-400 text-yellow-400"
                       : "fill-gray-300 text-gray-300"
                   }`}
                 />
               ))}
-              <p className="text-lg text-black font-bold">4.3</p>
+              <p className="text-lg text-black font-bold">
+                {ratingReviewsCount > 0 ? ratingAverage.toFixed(1) : "0"}
+              </p>
             </div>
-            <p className="text-sm text-[#4a4a4a]">(32 reseñas)</p>
+            <p className="text-sm text-[#4a4a4a]">
+              {ratingReviewsCount > 0
+                ? `(${ratingReviewsCount} ${ratingReviewsCount === 1 ? "reseña" : "reseñas"})`
+                : "(No hay reseñas disponibles)"}
+            </p>
           </div>
 
           {/* Habilidades y Experiencia + Disponibilidad Horaria - Dos Columnas */}
