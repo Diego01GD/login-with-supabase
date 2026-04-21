@@ -6,6 +6,8 @@ import {
 } from "@/lib/email/notifications";
 import { NextRequest, NextResponse } from "next/server";
 
+const ACTIVE_EXCHANGES_LIMIT = 6;
+
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient();
@@ -33,7 +35,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Verificar que el usuario no tenga más de 5 intercambios activos (status='accepted')
+    // Verificar que el usuario no tenga más de 6 intercambios activos (status='accepted')
     const { count: activeExchanges } = await supabase
       .from("skill_exchanges")
       .select("*", { count: "exact", head: true })
@@ -41,9 +43,11 @@ export async function POST(request: NextRequest) {
         `and(sender_id.eq.${senderId},status.eq.accepted),and(receiver_id.eq.${senderId},status.eq.accepted)`,
       );
 
-    if ((activeExchanges ?? 0) >= 5) {
+    if ((activeExchanges ?? 0) >= ACTIVE_EXCHANGES_LIMIT) {
       return NextResponse.json(
-        { error: "Has alcanzado el límite de 5 intercambios activos" },
+        {
+          error: `Has alcanzado el límite de ${ACTIVE_EXCHANGES_LIMIT} intercambios activos`,
+        },
         { status: 400 },
       );
     }

@@ -62,6 +62,48 @@ type TrendingSkill = {
   count: number;
 };
 
+type RankedMatchedUser = MatchedUser & {
+  distanceScore: number;
+};
+
+const DAY_ORDER: Record<string, number> = {
+  Lunes: 0,
+  Martes: 1,
+  Miercoles: 2,
+  Miércoles: 2,
+  Jueves: 3,
+  Viernes: 4,
+  Sabado: 5,
+  Sábado: 5,
+  Domingo: 6,
+};
+
+function parseSlotMidpoint(range: string): number {
+  const [start, end] = range.split("-").map((part) => part.trim());
+  if (!start || !end) return Number.MAX_SAFE_INTEGER;
+
+  const [startHour, startMinute] = start.split(":").map(Number);
+  const [endHour, endMinute] = end.split(":").map(Number);
+
+  if (
+    Number.isNaN(startHour) ||
+    Number.isNaN(startMinute) ||
+    Number.isNaN(endHour) ||
+    Number.isNaN(endMinute)
+  ) {
+    return Number.MAX_SAFE_INTEGER;
+  }
+
+  const startTotal = startHour * 60 + startMinute;
+  const endTotal = endHour * 60 + endMinute;
+  return Math.floor((startTotal + endTotal) / 2);
+}
+
+function circularDayDistance(a: number, b: number): number {
+  const diff = Math.abs(a - b);
+  return Math.min(diff, 7 - diff);
+}
+
 export default async function main() {
   unstable_noStore();
 
@@ -141,23 +183,23 @@ export default async function main() {
   ) as Record<string, Skill>;
 
   const userInterestIds = typedUserInterests.map((i) => i.skill_id);
-  const preferredSlotIds = Array.from(
-    new Set(
-      typedAllAvailability
-        .filter((ua) => ua.profile_id === userId)
-        .map((ua) => ua.slot_id),
-    ),
+  const currentUserAvailability = typedAllAvailability.filter(
+    (ua) => ua.profile_id === userId,
   );
-  const preferredSlotRank = new Map<string, number>(
-    preferredSlotIds.map((slotId, index) => [slotId, index]),
+  const userAvailabilityKeySet = new Set(
+    currentUserAvailability.map((ua) => `${ua.day}|${ua.slot_id}`),
+  );
+
+  const slotMidpointMap = new Map<string, number>(
+    typedTimeSlots.map((slot) => [slot.id, parseSlotMidpoint(slot.range)]),
   );
   const allShiftsSet = new Set(typedTimeSlots.map((ts) => ts.shift));
   const allShiftsArray = Array.from(allShiftsSet);
   const allCategoriesSet = new Set(typedAllSkills.map((s) => s.category));
   const allCategoriesArray = Array.from(allCategoriesSet).sort();
 
-  const matchedUsers: MatchedUser[] = [];
-  const fallbackUsers: MatchedUser[] = [];
+  const matchedUsers: RankedMatchedUser[] = [];
+  const fallbackUsers: RankedMatchedUser[] = [];
 
   typedOtherProfiles.forEach((otherProfile) => {
     const offeringSkills = typedAllUserSkills.filter(
@@ -167,27 +209,65 @@ export default async function main() {
       (ua) => ua.profile_id === otherProfile.id,
     );
 
-    const uniqueOtherSlotIds = Array.from(
-      new Set(
+    const uniqueOtherAvailability = Array.from(
+      new Map(
         otherAvailability
-          .map((ua) => ua.slot_id)
-          .filter((slotId) => Boolean(slotMap[slotId])),
-      ),
+          .filter((ua) => Boolean(slotMap[ua.slot_id]))
+          .map((ua) => [`${ua.day}|${ua.slot_id}`, ua]),
+      ).values(),
     );
 
-    // Prioriza el horario del otro usuario que esté más cercano a los horarios preferidos del usuario actual.
-    const sortedByPreference = [...uniqueOtherSlotIds].sort((a, b) => {
-      const rankA = preferredSlotRank.get(a) ?? Number.MAX_SAFE_INTEGER;
-      const rankB = preferredSlotRank.get(b) ?? Number.MAX_SAFE_INTEGER;
-      return rankA - rankB;
-    });
+    let hasExactOverlap = false;
+    let bestDistanceScore = Number.MAX_SAFE_INTEGER;
+    let bestAvailabilitySlot: Availability | undefined;
 
-    const bestSlot = sortedByPreference[0]
-      ? slotMap[sortedByPreference[0]]
+    if (uniqueOtherAvailability.length > 0) {
+      uniqueOtherAvailability.forEach((otherSlot) => {
+        const otherKey = `${otherSlot.day}|${otherSlot.slot_id}`;
+        if (userAvailabilityKeySet.has(otherKey)) {
+          hasExactOverlap = true;
+          if (0 < bestDistanceScore) {
+            bestDistanceScore = 0;
+            bestAvailabilitySlot = otherSlot;
+          }
+          return;
+        }
+
+        const otherDayIndex = DAY_ORDER[otherSlot.day] ?? 0;
+        const otherMid =
+          slotMidpointMap.get(otherSlot.slot_id) ?? Number.MAX_SAFE_INTEGER;
+
+        currentUserAvailability.forEach((mySlot) => {
+          const myDayIndex = DAY_ORDER[mySlot.day] ?? 0;
+          const myMid =
+            slotMidpointMap.get(mySlot.slot_id) ?? Number.MAX_SAFE_INTEGER;
+
+          const dayDistance = circularDayDistance(otherDayIndex, myDayIndex);
+          const minuteDistance = Math.abs(otherMid - myMid);
+
+          const score =
+            dayDistance === 0
+              ? 100 + minuteDistance
+              : 1000 + dayDistance * 180 + Math.floor(minuteDistance / 2);
+
+          if (score < bestDistanceScore) {
+            bestDistanceScore = score;
+            bestAvailabilitySlot = otherSlot;
+          }
+        });
+      });
+    }
+
+    if (!Number.isFinite(bestDistanceScore)) {
+      bestDistanceScore = Number.MAX_SAFE_INTEGER;
+    }
+
+    const bestSlot = bestAvailabilitySlot
+      ? slotMap[bestAvailabilitySlot.slot_id]
       : undefined;
 
     const scheduleDisplay = bestSlot?.range || "Sin horario definido";
-    const scheduleCount = uniqueOtherSlotIds.length;
+    const scheduleCount = uniqueOtherAvailability.length;
 
     const otherShifts = new Set(
       otherAvailability.map((ua) => slotMap[ua.slot_id]?.shift).filter(Boolean),
@@ -215,7 +295,7 @@ export default async function main() {
         }),
       );
 
-      const userData: MatchedUser = {
+      const userData: RankedMatchedUser = {
         id: otherProfile.id,
         name: otherProfile.full_name || "Usuario",
         avatarUrl: otherProfile.avatar_url,
@@ -228,11 +308,19 @@ export default async function main() {
         matchScore: "fair" as const,
         shift: bestSlot?.shift || Array.from(otherShifts)[0] || "Mañana",
         availability: availabilityArray,
+        distanceScore: bestDistanceScore,
       };
 
-      if (userInterestIds.includes(skill.skill_id)) {
+      const hasSkillMatch = userInterestIds.includes(skill.skill_id);
+
+      if (hasSkillMatch && hasExactOverlap) {
+        userData.matchScore = "perfect";
+        matchedUsers.push(userData);
+      } else if (hasSkillMatch) {
+        userData.matchScore = "good";
         matchedUsers.push(userData);
       } else {
+        userData.matchScore = "fair";
         fallbackUsers.push(userData);
       }
     });
@@ -242,8 +330,13 @@ export default async function main() {
     const scoreOrder = { perfect: 0, good: 1, fair: 2 };
     return (
       scoreOrder[a.matchScore] - scoreOrder[b.matchScore] ||
+      a.distanceScore - b.distanceScore ||
       b.name.localeCompare(a.name)
     );
+  });
+
+  const sortedFallback = fallbackUsers.sort((a, b) => {
+    return a.distanceScore - b.distanceScore || b.name.localeCompare(a.name);
   });
 
   // Ranking dinámico de habilidades en tendencia basado en la base de datos.
@@ -304,8 +397,8 @@ export default async function main() {
       activeExchangesCount={activeExchangesCount || 0}
       pendingReceivedCount={pendingReceivedCount || 0}
       unreadMessagesCount={unreadMessagesCount || 0}
-      matches={sortedMatches}
-      fallbackUsers={fallbackUsers}
+      matches={sortedMatches.map(({ distanceScore, ...user }) => user)}
+      fallbackUsers={sortedFallback.map(({ distanceScore, ...user }) => user)}
       allCategories={allCategoriesArray}
       allShifts={allShiftsArray}
       skillMap={skillMap}

@@ -43,6 +43,8 @@ interface DiscoveryContentProps {
   trendingSkills?: TrendingSkill[];
 }
 
+const ACTIVE_EXCHANGES_LIMIT = 6;
+
 export function DiscoveryContent({
   matches,
   fallbackUsers,
@@ -360,16 +362,18 @@ export function DiscoveryContent({
             <span className="font-bold text-[#0057cc]">
               {activeExchangesCount}
             </span>{" "}
-            de 5 activos
+            de {ACTIVE_EXCHANGES_LIMIT} activos
           </p>
           <div className="w-full bg-[#e8f0f2] rounded-full h-3 overflow-hidden">
             <div
               className="bg-gradient-to-r from-[#0057cc] to-[#9cd2d3] h-full rounded-full transition-all duration-300"
-              style={{ width: `${(activeExchangesCount / 5) * 100}%` }}
+              style={{
+                width: `${Math.min(100, (activeExchangesCount / ACTIVE_EXCHANGES_LIMIT) * 100)}%`,
+              }}
             />
           </div>
           <p className="text-xs text-[#4a4a4a] mt-2 text-right">
-            {activeExchangesCount}/5
+            {activeExchangesCount}/{ACTIVE_EXCHANGES_LIMIT}
           </p>
         </div>
 

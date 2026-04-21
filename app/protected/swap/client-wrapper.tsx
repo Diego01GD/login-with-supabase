@@ -10,6 +10,8 @@ interface SwapPageClientWrapperProps {
   activeExchanges: number;
 }
 
+const ACTIVE_EXCHANGES_LIMIT = 6;
+
 export default function SwapPageClientWrapper({
   userId,
   activeExchanges: initialActive,
@@ -45,7 +47,7 @@ export default function SwapPageClientWrapper({
                 Intercambios Activos
               </p>
               <div className="flex items-center justify-center w-16 h-16 rounded-full bg-[#0057cc] text-white font-bold text-xl shadow-md">
-                {activeExchanges}/5
+                {activeExchanges}/{ACTIVE_EXCHANGES_LIMIT}
               </div>
             </div>
           </div>

@@ -22,6 +22,8 @@ interface SwapTabsContentProps {
   onPendingReceivedChange?: (count: number) => void;
 }
 
+const ACTIVE_EXCHANGES_LIMIT = 6;
+
 export function SwapTabsContent({
   userId,
   onActiveExchangesChange,
@@ -883,19 +885,22 @@ export function SwapTabsContent({
                 strokeWidth="8"
                 fill="transparent"
                 strokeDasharray={282.7}
-                strokeDashoffset={282.7 - 282.7 * (activeCount / 5)}
+                strokeDashoffset={
+                  282.7 -
+                  282.7 * Math.min(1, activeCount / ACTIVE_EXCHANGES_LIMIT)
+                }
                 strokeLinecap="round"
                 className="text-[#0057cc] transition-all duration-1000 ease-out"
               />
             </svg>
             <div className="absolute inset-0 flex flex-col items-center justify-center">
               <span className="text-4xl font-black text-[#114c5f]">
-                {activeCount}/5
+                {activeCount}/{ACTIVE_EXCHANGES_LIMIT}
               </span>
             </div>
           </div>
           <p className="text-gray-500 font-medium mt-6">
-            Activos {activeCount} de 5
+            Activos {activeCount} de {ACTIVE_EXCHANGES_LIMIT}
           </p>
         </div>
         <div className="bg-[#0b1219] p-8 rounded-[2rem] text-white">

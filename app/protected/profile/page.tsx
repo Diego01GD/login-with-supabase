@@ -41,6 +41,16 @@ type Availability = {
   comment: string;
 };
 
+type ReviewSummaryRow = {
+  general_rating: number;
+  exchange_id: string;
+};
+
+function average(values: number[]) {
+  if (!values.length) return 0;
+  return values.reduce((sum, value) => sum + value, 0) / values.length;
+}
+
 export default async function ProtectedPage() {
   const supabase = await createClient();
   const { data: sessionData, error: userError } = await supabase.auth.getUser();
@@ -84,6 +94,11 @@ export default async function ProtectedPage() {
     .select("day, slot_id, comment")
     .eq("profile_id", userId);
 
+  const { data: receivedReviews } = await supabase
+    .from("exchange_reviews")
+    .select("general_rating, exchange_id")
+    .eq("reviewee_id", userId);
+
   const { data: timeSlots } = await supabase
     .from("time_slots")
     .select("id, range, shift");
@@ -92,6 +107,7 @@ export default async function ProtectedPage() {
   const typedUserInterests = (userInterests ?? []) as UserInterest[];
   const typedUserAvailability = (userAvailability ?? []) as Availability[];
   const typedTimeSlots = (timeSlots ?? []) as TimeSlot[];
+  const typedReceivedReviews = (receivedReviews ?? []) as ReviewSummaryRow[];
 
   const slotMap = Object.fromEntries(
     typedTimeSlots.map((ts) => [ts.id, ts]),
@@ -128,20 +144,22 @@ export default async function ProtectedPage() {
     return acc;
   }, {});
 
-  const reputation = "N/A";
+  const reputationAverage = average(
+    typedReceivedReviews.map((review) => review.general_rating),
+  );
+  const successfulCollaborations = typedReceivedReviews.length;
 
   return (
     <div className="min-h-screen font-gentium mt-7">
       <div className="w-full text-right">
         <Link
-            href="/protected/"
-            className="text-[#0057cc] hover:text-[#004499] font-semibold mb-8 inline-block"
-          >
-            ← Volver a la ventana principal
-          </Link>
+          href="/protected/"
+          className="text-[#0057cc] hover:text-[#004499] font-semibold mb-8 inline-block"
+        >
+          ← Volver a la ventana principal
+        </Link>
       </div>
       <div className="max-w-full mx-auto bg-white space-y-8 p-6 md:p-12">
-        
         <header className="bg-white rounded-[2rem] p-6 md:p-8 shadow-lg border border-[#d7e5ef] flex flex-col md:flex-row justify-between items-start gap-6 relative">
           <div className="flex items-start gap-5">
             <div className="w-28 h-28 rounded-full overflow-hidden border-4 border-[#3983A6] bg-[#eff6ff]">
@@ -164,7 +182,7 @@ export default async function ProtectedPage() {
                 {typedProfile.full_name}
               </h1>
               <p className="text-xl font-semibold text-[#134f78] mt-1">
-                {typedProfile.career} • {typedProfile.semester}° Semestre
+                {typedProfile.career}
               </p>
               <p className="text-sm md:text-base text-[#3b5b79] mt-1">
                 {sessionData.user.email}
@@ -196,9 +214,16 @@ export default async function ProtectedPage() {
             <h2 className="text-lg font-bold text-[#114c5f] mb-3">
               Reputación SkillSwap
             </h2>
-            <p className="text-5xl font-black text-[#0f4f6f]">{reputation}</p>
+            <p className="text-5xl font-black text-[#0f4f6f]">
+              {successfulCollaborations > 0
+                ? reputationAverage.toFixed(1)
+                : "0.0"}
+            </p>
             <p className="text-sm text-[#385e7d] mt-1">
-              Colaboraciones exitosas
+              {successfulCollaborations} colaboraciones exitosas
+            </p>
+            <p className="text-xs text-[#6b87a3] mt-2">
+              Promedio basado en feedback recibido
             </p>
           </article>
 
